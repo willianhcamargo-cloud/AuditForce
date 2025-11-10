@@ -4,10 +4,11 @@ import type { User } from '../types';
 interface UserManagementProps {
     users: User[];
     onCreateUser: () => void;
+    onEditUser: (userId: string) => void;
     currentUser: User;
 }
 
-export const UserManagement: React.FC<UserManagementProps> = ({ users, onCreateUser, currentUser }) => {
+export const UserManagement: React.FC<UserManagementProps> = ({ users, onCreateUser, onEditUser, currentUser }) => {
     return (
         <div className="bg-surface dark:bg-dark-surface rounded-lg shadow-md p-6">
             <div className="flex justify-between items-center mb-6">
@@ -31,6 +32,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({ users, onCreateU
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Nome</th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Função</th>
+                            {currentUser.role === 'Administrator' && (
+                                <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ações</span></th>
+                            )}
                         </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-dark-surface divide-y divide-gray-200 dark:divide-gray-700">
@@ -48,6 +52,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({ users, onCreateU
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.email}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.role}</td>
+                                {currentUser.role === 'Administrator' && (
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button onClick={() => onEditUser(user.id)} className="text-primary hover:text-blue-700 dark:text-dark-primary dark:hover:text-blue-400">
+                                            Editar
+                                        </button>
+                                    </td>
+                                )}
                             </tr>
                         ))}
                     </tbody>

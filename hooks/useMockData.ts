@@ -102,6 +102,10 @@ export const useMockData = () => {
         };
         setUsers(current => [...current, newUser]);
     }, []);
+    
+    const updateUser = useCallback((userData: User) => {
+        setUsers(current => current.map(u => u.id === userData.id ? { ...u, ...userData } : u));
+    }, []);
 
     const addAudit = useCallback((auditData: Omit<Audit, 'id' | 'findings' | 'status' | 'code'>) => {
         const grid = grids.find(g => g.id === auditData.gridId);
@@ -233,6 +237,7 @@ export const useMockData = () => {
         audits,
         actionPlans,
         addUser,
+        updateUser,
         addAudit,
         saveGrid,
         deleteGrid,

@@ -26,6 +26,7 @@ const App: React.FC = () => {
 
     // Modal States
     const [isCreateUserModalOpen, setCreateUserModalOpen] = useState(false);
+    const [userToEdit, setUserToEdit] = useState<User | null>(null);
     const [isCreateAuditModalOpen, setCreateAuditModalOpen] = useState(false);
     const [isCreateGridModalOpen, setCreateGridModalOpen] = useState(false);
     const [gridToEdit, setGridToEdit] = useState<AuditGrid | null>(null);
@@ -65,9 +66,27 @@ const App: React.FC = () => {
         setSelectedAuditId(null);
     };
 
-    const handleCreateUser = (userData: Omit<User, 'id' | 'avatarUrl'>) => {
-        mockData.addUser(userData);
+    const handleSaveUser = (userData: User | Omit<User, 'id' | 'avatarUrl'>) => {
+        if ('id' in userData) {
+            mockData.updateUser(userData);
+        } else {
+            mockData.addUser(userData);
+        }
         setCreateUserModalOpen(false);
+        setUserToEdit(null);
+    };
+    
+    const handleOpenEditUserModal = (userId: string) => {
+        const user = mockData.users.find(u => u.id === userId);
+        if (user) {
+            setUserToEdit(user);
+            setCreateUserModalOpen(true);
+        }
+    };
+    
+    const handleOpenCreateUserModal = () => {
+        setUserToEdit(null);
+        setCreateUserModalOpen(true);
     };
 
     const handleSaveAudit = (auditData: Omit<Audit, 'id' | 'findings' | 'status' | 'code'>) => {
@@ -172,7 +191,7 @@ const App: React.FC = () => {
             case 'grids':
                 return <GridManagement grids={mockData.grids} onCreateGrid={() => { setGridToEdit(null); setCreateGridModalOpen(true); }} onEditGrid={handleEditGrid} onDeleteGrid={mockData.deleteGrid} currentUser={currentUser!} />;
             case 'users':
-                return <UserManagement users={mockData.users} onCreateUser={() => setCreateUserModalOpen(true)} currentUser={currentUser!} />;
+                return <UserManagement users={mockData.users} onCreateUser={handleOpenCreateUserModal} onEditUser={handleOpenEditUserModal} currentUser={currentUser!} />;
             default:
                 return <div>Página não encontrada</div>;
         }
@@ -195,8 +214,9 @@ const App: React.FC = () => {
             </main>
             <CreateUserModal
                 isOpen={isCreateUserModalOpen}
-                onClose={() => setCreateUserModalOpen(false)}
-                onSubmit={handleCreateUser}
+                onClose={() => { setCreateUserModalOpen(false); setUserToEdit(null); }}
+                onSubmit={handleSaveUser}
+                userToEdit={userToEdit}
             />
             <CreateAuditModal
                 isOpen={isCreateAuditModalOpen}
