@@ -1,0 +1,7 @@
+{
+  "name": "AuditForce - Gestão de Auditorias Internas",
+  "description": "Uma aplicação completa para gestão de auditorias, com delegação de tarefas, dashboards de progresso, e planos de ação. Otimize seus processos de auditoria com visualizações claras e ferramentas colaborativas.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
