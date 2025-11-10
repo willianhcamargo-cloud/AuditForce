@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import type { Audit, User, AuditStatus } from '../types';
 import { FindingStatus } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { AlertIcon } from './AlertIcon';
 
 interface AuditListProps {
     audits: Audit[];
@@ -160,12 +161,20 @@ export const AuditList: React.FC<AuditListProps> = ({ audits, users, onSelectAud
                             const nonCompliantFindings = audit.findings.filter(f => f.status === FindingStatus.NonCompliant).length;
                             const compliantOrNaFindings = totalFindings - nonCompliantFindings;
                             const compliancePercentage = totalFindings > 0 ? (compliantOrNaFindings / totalFindings) * 100 : 100;
+
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0); // Set to start of today for comparison
+                            const endDate = new Date(audit.endDate);
+                            const isOverdue = endDate < today && audit.status !== 'Concluído';
                             
                             return (
                                 <tr key={audit.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500 dark:text-gray-400">{audit.code}</td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{audit.title}</div>
+                                        <div className="flex items-center">
+                                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{audit.title}</div>
+                                            {isOverdue && <AlertIcon />}
+                                        </div>
                                         <div className="text-sm text-gray-500 dark:text-gray-400">{audit.scope}</div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{findUserName(audit.auditorId)}</td>
