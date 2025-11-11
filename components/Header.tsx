@@ -1,29 +1,20 @@
-
 import React, { useState } from 'react';
 import type { User } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface HeaderProps {
     currentUser: User;
-    onNavigate: (page: 'dashboard' | 'audits' | 'grids' | 'users') => void;
     onLogout: () => void;
     onBack?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentUser, onNavigate, onLogout, onBack }) => {
+export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, onBack }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const { theme, toggleTheme } = useTheme();
 
-    const navItems = [
-        { label: 'Dashboard', page: 'dashboard' as const },
-        { label: 'Auditorias', page: 'audits' as const },
-        { label: 'Grades', page: 'grids' as const },
-        { label: 'Usuários', page: 'users' as const },
-    ];
-
     return (
-        <header className="bg-surface dark:bg-dark-surface shadow-md">
-            <div className="container mx-auto px-4 md:px-6">
+        <header className="bg-surface dark:bg-dark-surface shadow-md flex-shrink-0 z-20">
+            <div className="px-4 md:px-6">
                 <div className="flex justify-between items-center py-4">
                     <div className="flex items-center space-x-4">
                         {onBack && (
@@ -35,14 +26,6 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onNavigate, onLogou
                         )}
                         <h1 className="text-2xl font-bold text-primary dark:text-dark-primary">AuditForce</h1>
                     </div>
-                    
-                    <nav className="hidden md:flex space-x-6">
-                        {navItems.map(item => (
-                            <button key={item.page} onClick={() => onNavigate(item.page)} className="text-gray-600 dark:text-gray-300 hover:text-primary dark:hover:text-dark-primary font-medium transition-colors">
-                                {item.label}
-                            </button>
-                        ))}
-                    </nav>
 
                     <div className="flex items-center space-x-4">
                         <button

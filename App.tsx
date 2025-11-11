@@ -15,8 +15,10 @@ import { CreateAuditModal } from './components/CreateAuditModal';
 import { CreateGridModal } from './components/CreateGridModal';
 import { generateRecommendation } from './services/geminiService';
 import { CreateActionPlanModal } from './components/CreateActionPlanModal';
+import { Sidebar } from './components/Sidebar';
+import { Chatbot } from './components/Chatbot';
 
-type Page = 'dashboard' | 'audits' | 'grids' | 'users';
+type Page = 'dashboard' | 'audits' | 'grids' | 'users' | 'chatbot';
 
 const App: React.FC = () => {
     const mockData = useMockData();
@@ -192,6 +194,25 @@ const App: React.FC = () => {
                 return <GridManagement grids={mockData.grids} onCreateGrid={() => { setGridToEdit(null); setCreateGridModalOpen(true); }} onEditGrid={handleEditGrid} onDeleteGrid={mockData.deleteGrid} currentUser={currentUser!} />;
             case 'users':
                 return <UserManagement users={mockData.users} onCreateUser={handleOpenCreateUserModal} onEditUser={handleOpenEditUserModal} currentUser={currentUser!} />;
+            case 'chatbot': {
+                const userAudits = mockData.audits.filter(
+                    (audit) => audit.auditorId === currentUser.id || currentUser.role === 'Administrator'
+                );
+                const userFindingIds = new Set(
+                    userAudits.flatMap((audit) => audit.findings.map((finding) => finding.id))
+                );
+                const userActionPlans = mockData.actionPlans.filter((plan) =>
+                    userFindingIds.has(plan.findingId)
+                );
+                return (
+                    <Chatbot
+                        currentUser={currentUser}
+                        audits={userAudits}
+                        grids={mockData.grids}
+                        actionPlans={userActionPlans}
+                    />
+                );
+            }
             default:
                 return <div>Página não encontrada</div>;
         }
@@ -202,16 +223,20 @@ const App: React.FC = () => {
     }
 
     return (
-        <div className="bg-background dark:bg-dark-background min-h-screen">
-            <Header
-                currentUser={currentUser}
-                onNavigate={handleNavigate}
-                onLogout={handleLogout}
-                onBack={selectedAuditId ? handleBackToAudits : undefined}
-            />
-            <main className="container mx-auto p-4 md:p-6">
-                {renderContent()}
-            </main>
+        <div className="flex h-screen bg-background dark:bg-dark-background text-on-surface dark:text-dark-on-surface">
+            <Sidebar onNavigate={handleNavigate} currentPage={currentPage} />
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <Header
+                    currentUser={currentUser}
+                    onLogout={handleLogout}
+                    onBack={selectedAuditId ? handleBackToAudits : undefined}
+                />
+                <main className="flex-1 overflow-y-auto">
+                    <div className="container mx-auto p-4 md:p-6 h-full">
+                      {renderContent()}
+                    </div>
+                </main>
+            </div>
             <CreateUserModal
                 isOpen={isCreateUserModalOpen}
                 onClose={() => { setCreateUserModalOpen(false); setUserToEdit(null); }}
