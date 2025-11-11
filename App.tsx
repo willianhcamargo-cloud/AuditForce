@@ -17,6 +17,7 @@ import { generateRecommendation } from './services/geminiService';
 import { CreateActionPlanModal } from './components/CreateActionPlanModal';
 import { Sidebar } from './components/Sidebar';
 import { Chatbot } from './components/Chatbot';
+import { ReportModal } from './components/ReportModal';
 
 type Page = 'dashboard' | 'audits' | 'grids' | 'users' | 'chatbot';
 
@@ -35,6 +36,13 @@ const App: React.FC = () => {
     const [isCreateActionPlanModalOpen, setCreateActionPlanModalOpen] = useState(false);
     const [actionPlanToEdit, setActionPlanToEdit] = useState<ActionPlan | null>(null);
     const [currentFindingIdForActionPlan, setCurrentFindingIdForActionPlan] = useState<string | null>(null);
+    const [reportData, setReportData] = useState<{
+        audit: Audit;
+        grid: AuditGrid;
+        auditor?: User;
+        actionPlans: ActionPlan[];
+        users: User[];
+    } | null>(null);
     
     // AI State
     const [aiRecommendation, setAiRecommendation] = useState('');
@@ -150,6 +158,25 @@ const App: React.FC = () => {
     const handleDeleteAttachment = (findingId: string, attachmentId: string) => {
         mockData.deleteAttachment(findingId, attachmentId);
     };
+
+    const handleOpenReport = (auditId: string) => {
+        const audit = mockData.audits.find(a => a.id === auditId);
+        if (!audit) return;
+
+        const grid = mockData.grids.find(g => g.id === audit.gridId);
+        if (!grid) return;
+
+        const auditor = mockData.users.find(u => u.id === audit.auditorId);
+        const actionPlans = mockData.actionPlans.filter(p => audit.findings.some(f => f.id === p.findingId));
+
+        setReportData({
+            audit,
+            grid,
+            auditor,
+            actionPlans,
+            users: mockData.users,
+        });
+    };
     
     const renderContent = () => {
         if (selectedAuditId) {
@@ -189,7 +216,7 @@ const App: React.FC = () => {
             case 'dashboard':
                 return <Dashboard audits={mockData.audits} actionPlans={mockData.actionPlans} currentUser={currentUser!} onNavigate={handleNavigate} />;
             case 'audits':
-                return <AuditList audits={mockData.audits} users={mockData.users} onSelectAudit={handleSelectAudit} onCreateAudit={() => setCreateAuditModalOpen(true)} onUpdateAuditStatus={mockData.updateAuditStatus} currentUser={currentUser!} />;
+                return <AuditList audits={mockData.audits} users={mockData.users} onSelectAudit={handleSelectAudit} onCreateAudit={() => setCreateAuditModalOpen(true)} onUpdateAuditStatus={mockData.updateAuditStatus} currentUser={currentUser!} onOpenReport={handleOpenReport} />;
             case 'grids':
                 return <GridManagement grids={mockData.grids} onCreateGrid={() => { setGridToEdit(null); setCreateGridModalOpen(true); }} onEditGrid={handleEditGrid} onDeleteGrid={mockData.deleteGrid} currentUser={currentUser!} />;
             case 'users':
@@ -263,6 +290,11 @@ const App: React.FC = () => {
                 users={mockData.users}
                 findingId={currentFindingIdForActionPlan}
                 planToEdit={actionPlanToEdit}
+            />
+            <ReportModal 
+                isOpen={!!reportData}
+                onClose={() => setReportData(null)}
+                data={reportData}
             />
         </div>
     );

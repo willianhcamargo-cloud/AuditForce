@@ -11,6 +11,7 @@ interface AuditListProps {
     onCreateAudit: () => void;
     onUpdateAuditStatus: (auditId: string, status: AuditStatus) => void;
     currentUser: User;
+    onOpenReport: (auditId: string) => void;
 }
 
 const statusClasses: Record<AuditStatus, string> = {
@@ -41,7 +42,7 @@ const CustomTooltip = ({ active, payload }: any) => {
     return null;
 };
 
-export const AuditList: React.FC<AuditListProps> = ({ audits, users, onSelectAudit, onCreateAudit, onUpdateAuditStatus, currentUser }) => {
+export const AuditList: React.FC<AuditListProps> = ({ audits, users, onSelectAudit, onCreateAudit, onUpdateAuditStatus, currentUser, onOpenReport }) => {
     const [isGanttVisible, setIsGanttVisible] = useState(false);
 
     const findUserName = useCallback((id: string) => users.find(u => u.id === id)?.name || 'Desconhecido', [users]);
@@ -200,20 +201,28 @@ export const AuditList: React.FC<AuditListProps> = ({ audits, users, onSelectAud
                                         {compliancePercentage.toFixed(1)}%
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onClick={() => onSelectAudit(audit.id)} className="text-primary hover:text-blue-700 dark:text-dark-primary dark:hover:text-blue-400 font-medium">
-                                            Ver Detalhes
-                                        </button>
+                                        <div className="flex items-center justify-end space-x-2">
+                                            <button
+                                                onClick={() => onOpenReport(audit.id)}
+                                                className="text-secondary hover:text-emerald-700 dark:text-secondary dark:hover:text-emerald-400 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                title="Relatório"
+                                                aria-label={`Gerar relatório para auditoria ${audit.code}`}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                  <path d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm0 10v-4h12v4H4zm2-7a1 1 0 011-1h2a1 1 0 110 2H7a1 1 0 01-1-1zm4 0a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1z" />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                onClick={() => onSelectAudit(audit.id)}
+                                                className="text-primary hover:text-blue-700 dark:text-dark-primary dark:hover:text-blue-400 font-medium"
+                                            >
+                                                Ver Detalhes
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             );
                         })}
-                        {visibleAudits.length === 0 && (
-                            <tr>
-                                <td colSpan={7} className="text-center py-10 text-gray-500 dark:text-gray-400">
-                                    Nenhuma auditoria encontrada para seu usuário.
-                                </td>
-                            </tr>
-                        )}
                     </tbody>
                 </table>
             </div>
