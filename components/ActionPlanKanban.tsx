@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { ActionPlan, User, Finding } from '../types';
 import { TaskStatus } from '../types';
 import { ActionPlanDetailsModal } from './ActionPlanDetailsModal';
+import { UserAvatar } from './UserAvatar';
 
 interface ActionPlanKanbanProps {
     actionPlans: ActionPlan[];
@@ -28,8 +29,8 @@ const ActionPlanCard: React.FC<{ plan: ActionPlan; user?: User; finding?: Findin
         <div className="flex justify-between items-center text-xs mt-3">
             {user && (
                 <div className="flex items-center">
-                    <img src={user.avatarUrl} alt={user.name} className="w-5 h-5 rounded-full mr-2" />
-                    <span className="text-gray-600 dark:text-gray-300">{user.name}</span>
+                    <UserAvatar user={user} size="xs" />
+                    <span className="text-gray-600 dark:text-gray-300 ml-2">{user.name}</span>
                 </div>
             )}
             <span className="text-gray-500 dark:text-gray-400">{new Date(plan.when).toLocaleDateString('pt-BR')}</span>

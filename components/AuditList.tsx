@@ -3,6 +3,7 @@ import type { Audit, User, AuditStatus } from '../types';
 import { FindingStatus } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { AlertIcon } from './AlertIcon';
+import { UserAvatar } from './UserAvatar';
 
 interface AuditListProps {
     audits: Audit[];
@@ -45,7 +46,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 export const AuditList: React.FC<AuditListProps> = ({ audits, users, onSelectAudit, onCreateAudit, onUpdateAuditStatus, currentUser, onOpenReport }) => {
     const [isGanttVisible, setIsGanttVisible] = useState(false);
 
-    const findUserName = useCallback((id: string) => users.find(u => u.id === id)?.name || 'Desconhecido', [users]);
+    const findUser = useCallback((id: string) => users.find(u => u.id === id), [users]);
 
     const visibleAudits = useMemo(() => {
         if (currentUser.role === 'Administrator') {
@@ -76,7 +77,7 @@ export const AuditList: React.FC<AuditListProps> = ({ audits, users, onSelectAud
             return {
                 name: audit.code,
                 title: audit.title,
-                auditorName: findUserName(audit.auditorId),
+                auditorName: findUser(audit.auditorId)?.name || 'Desconhecido',
                 startOffset,
                 duration,
                 status: audit.status,
@@ -88,7 +89,7 @@ export const AuditList: React.FC<AuditListProps> = ({ audits, users, onSelectAud
         const maxEndOffset = Math.max(...data.map(d => d.startOffset + d.duration));
 
         return { data, domain: [0, maxEndOffset + 5] }; // Add padding to domain
-    }, [visibleAudits, findUserName]);
+    }, [visibleAudits, findUser]);
     
     return (
         <div className="bg-surface dark:bg-dark-surface rounded-lg shadow-md p-6">
@@ -162,6 +163,7 @@ export const AuditList: React.FC<AuditListProps> = ({ audits, users, onSelectAud
                             const nonCompliantFindings = audit.findings.filter(f => f.status === FindingStatus.NonCompliant).length;
                             const compliantOrNaFindings = totalFindings - nonCompliantFindings;
                             const compliancePercentage = totalFindings > 0 ? (compliantOrNaFindings / totalFindings) * 100 : 100;
+                            const auditor = findUser(audit.auditorId);
 
                             const today = new Date();
                             today.setHours(0, 0, 0, 0); // Set to start of today for comparison
@@ -178,7 +180,12 @@ export const AuditList: React.FC<AuditListProps> = ({ audits, users, onSelectAud
                                         </div>
                                         <div className="text-sm text-gray-500 dark:text-gray-400">{audit.scope}</div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{findUserName(audit.auditorId)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                        <div className="flex items-center gap-2">
+                                            {auditor && <UserAvatar user={auditor} size="sm" />}
+                                            <span>{auditor?.name || 'Desconhecido'}</span>
+                                        </div>
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                         {new Date(audit.startDate).toLocaleDateString('pt-BR')} - {new Date(audit.endDate).toLocaleDateString('pt-BR')}
                                     </td>

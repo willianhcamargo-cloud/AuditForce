@@ -8,10 +8,10 @@ const generateId = () => Math.random().toString(36).substring(2, 11);
 
 // Initial Mock Data
 const initialUsers: User[] = [
-    { id: 'user-1', name: 'Alice Admin', email: 'admin@example.com', role: 'Administrator', avatarUrl: `https://i.pravatar.cc/150?u=user-1`, password: 'password' },
-    { id: 'user-2', name: 'Bob Auditor', email: 'auditor@example.com', role: 'Auditor', avatarUrl: `https://i.pravatar.cc/150?u=user-2`, password: 'password' },
-    { id: 'user-3', name: 'Charlie Manager', email: 'manager@example.com', role: 'Manager', avatarUrl: `https://i.pravatar.cc/150?u=user-3`, password: 'password' },
-    { id: 'user-4', name: 'Diana Employee', email: 'employee@example.com', role: 'Employee', avatarUrl: `https://i.pravatar.cc/150?u=user-4`, password: 'password' },
+    { id: 'user-1', name: 'Willian Huller', email: 'willianhcamargo@gmail.com', role: 'Administrator', avatarUrl: `https://i.pravatar.cc/150?u=user-1`, status: 'Offline' },
+    { id: 'user-2', name: 'Bob Auditor', email: 'auditor@example.com', role: 'Auditor', avatarUrl: `https://i.pravatar.cc/150?u=user-2`, password: 'password', status: 'Offline' },
+    { id: 'user-3', name: 'Charlie Manager', email: 'manager@example.com', role: 'Manager', avatarUrl: `https://i.pravatar.cc/150?u=user-3`, password: 'password', status: 'Offline' },
+    { id: 'user-4', name: 'Diana Employee', email: 'employee@example.com', role: 'Employee', avatarUrl: `https://i.pravatar.cc/150?u=user-4`, password: 'password', status: 'Offline' },
 ];
 
 const initialGrids: AuditGrid[] = [
@@ -94,10 +94,11 @@ export const useMockData = () => {
     const [audits, setAudits] = useState<Audit[]>(initialAudits);
     const [actionPlans, setActionPlans] = useState<ActionPlan[]>(initialActionPlans);
 
-    const addUser = useCallback((userData: Omit<User, 'id' | 'avatarUrl'>) => {
+    const addUser = useCallback((userData: Omit<User, 'id' | 'avatarUrl' | 'status'> & { avatarUrl?: string }) => {
         const newUser: User = {
             id: generateId(),
-            avatarUrl: `https://i.pravatar.cc/150?u=${generateId()}`,
+            avatarUrl: userData.avatarUrl || `https://i.pravatar.cc/150?u=${generateId()}`,
+            status: 'Offline',
             ...userData,
         };
         setUsers(current => [...current, newUser]);

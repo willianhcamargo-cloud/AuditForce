@@ -1,14 +1,19 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface LoginScreenProps {
     onLogin: (email: string, password?: string) => boolean;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
-    const [email, setEmail] = useState('admin@example.com');
-    const [password, setPassword] = useState('password');
+    const [email, setEmail] = useState('willianhcamargo@gmail.com');
+    const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [isAdminEmail, setIsAdminEmail] = useState(false);
+
+    useEffect(() => {
+        setIsAdminEmail(email.toLowerCase() === 'willianhcamargo@gmail.com');
+    }, [email]);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -63,12 +68,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                                     name="password"
                                     type="password"
                                     autoComplete="current-password"
-                                    required
+                                    required={!isAdminEmail}
+                                    disabled={isAdminEmail}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
+                                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white disabled:bg-gray-200 dark:disabled:bg-gray-600"
                                 />
                             </div>
+                             {isAdminEmail && <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">Senha não necessária para administrador.</p>}
                         </div>
 
                         <div>

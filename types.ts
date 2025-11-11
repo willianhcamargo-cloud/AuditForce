@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   name: string;
@@ -6,6 +5,7 @@ export interface User {
   role: 'Auditor' | 'Manager' | 'Employee' | 'Administrator';
   avatarUrl: string;
   password?: string;
+  status: 'Online' | 'Offline';
 }
 
 export enum TaskStatus {

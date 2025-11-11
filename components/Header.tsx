@@ -1,16 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import type { User } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
+import { UserAvatar } from './UserAvatar';
 
 interface HeaderProps {
     currentUser: User;
     onLogout: () => void;
     onBack?: () => void;
+    onUpdateAvatar: (file: File) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, onBack }) => {
+export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, onBack, onUpdateAvatar }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const { theme, toggleTheme } = useTheme();
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            onUpdateAvatar(e.target.files[0]);
+            setIsMenuOpen(false);
+        }
+    };
 
     return (
         <header className="bg-surface dark:bg-dark-surface shadow-md flex-shrink-0 z-20">
@@ -45,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, onBack })
                         </button>
                         <div className="relative">
                             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="flex items-center space-x-2">
-                                <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-10 h-10 rounded-full border-2 border-gray-200 dark:border-gray-600" />
+                                <UserAvatar user={currentUser} size="md" />
                                 <span className="hidden sm:inline font-medium text-gray-700 dark:text-gray-200">{currentUser.name}</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 dark:text-gray-400" viewBox="0 0 20 20" fill="currentColor">
                                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -57,6 +67,11 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, onBack })
                                         <p className="font-semibold">{currentUser.name}</p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">{currentUser.role}</p>
                                     </div>
+                                    <div className="border-t border-gray-100 dark:border-gray-700"></div>
+                                    <button onClick={() => fileInputRef.current?.click()} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                                        Alterar Foto
+                                    </button>
+                                    <input type="file" ref={fileInputRef} onChange={handleAvatarChange} className="hidden" accept="image/*" />
                                     <div className="border-t border-gray-100 dark:border-gray-700"></div>
                                     <button onClick={onLogout} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
                                         Sair

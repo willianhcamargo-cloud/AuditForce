@@ -4,6 +4,7 @@ import { FindingStatus, TaskStatus } from '../types';
 import { FindingDetailsModal } from './FindingDetailsModal';
 import { ActionPlanKanban } from './ActionPlanKanban';
 import { ConfirmationModal } from './ConfirmationModal';
+import { UserAvatar } from './UserAvatar';
 
 interface AuditDetailsProps {
     audit: Audit;
@@ -78,7 +79,13 @@ export const AuditDetails: React.FC<AuditDetailsProps> = (props) => {
                     </div>
                 </div>
                 <div className="mt-4 border-t dark:border-gray-700 pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm items-center">
-                    <div className="text-gray-700 dark:text-gray-300"><span className="font-semibold">Auditor:</span> {auditor?.name || 'N/A'}</div>
+                    <div className="text-gray-700 dark:text-gray-300">
+                        <div className="flex items-center gap-2">
+                            <span className="font-semibold">Auditor:</span> 
+                            {auditor && <UserAvatar user={auditor} size="sm" />}
+                            <span>{auditor?.name || 'N/A'}</span>
+                        </div>
+                    </div>
                     <div className="text-gray-700 dark:text-gray-300"><span className="font-semibold">Início:</span> {new Date(audit.startDate).toLocaleDateString('pt-BR')}</div>
                     <div className="text-gray-700 dark:text-gray-300"><span className="font-semibold">Fim:</span> {new Date(audit.endDate).toLocaleDateString('pt-BR')}</div>
                     <div className="flex items-center text-gray-700 dark:text-gray-300">

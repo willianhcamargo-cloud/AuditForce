@@ -18,8 +18,18 @@ import { CreateActionPlanModal } from './components/CreateActionPlanModal';
 import { Sidebar } from './components/Sidebar';
 import { Chatbot } from './components/Chatbot';
 import { ReportModal } from './components/ReportModal';
+import { Toast } from './components/Toast';
 
 type Page = 'dashboard' | 'audits' | 'grids' | 'users' | 'chatbot';
+
+interface ToastMessage {
+    id: number;
+    message: string;
+    type: 'success' | 'error';
+}
+
+export type UserSubmitData = (Omit<User, 'id' | 'avatarUrl' | 'status'> | Omit<User, 'avatarUrl' | 'status'>) & { avatarFile?: File | null };
+
 
 const App: React.FC = () => {
     const mockData = useMockData();
@@ -48,16 +58,43 @@ const App: React.FC = () => {
     const [aiRecommendation, setAiRecommendation] = useState('');
     const [isGeneratingAIRecommendation, setIsGeneratingAIRecommendation] = useState(false);
 
+    // Toast State
+    const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+    const addToast = (message: string, type: 'success' | 'error' = 'success') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => {
+            setToasts(prev => prev.filter(toast => toast.id !== id));
+        }, 5000);
+    };
+
     const handleLogin = (email: string, password?: string): boolean => {
-        const user = mockData.users.find(u => u.email === email && u.password === password);
+        const lowerCaseEmail = email.toLowerCase();
+        let user: User | undefined;
+
+        // Special case for passwordless admin login
+        if (lowerCaseEmail === 'willianhcamargo@gmail.com') {
+            user = mockData.users.find(u => u.email.toLowerCase() === lowerCaseEmail && u.role === 'Administrator');
+        } else {
+            // Standard login for all other users
+            user = mockData.users.find(u => u.email.toLowerCase() === lowerCaseEmail && u.password === password);
+        }
+        
         if (user) {
-            setCurrentUser(user);
+            const userWithOnlineStatus: User = { ...user, status: 'Online' };
+            mockData.updateUser(userWithOnlineStatus);
+            setCurrentUser(userWithOnlineStatus);
             return true;
         }
+
         return false;
     };
 
     const handleLogout = () => {
+        if (currentUser) {
+            mockData.updateUser({ ...currentUser, status: 'Offline' });
+        }
         setCurrentUser(null);
         setCurrentPage('dashboard');
         setSelectedAuditId(null);
@@ -76,12 +113,42 @@ const App: React.FC = () => {
         setSelectedAuditId(null);
     };
 
-    const handleSaveUser = (userData: User | Omit<User, 'id' | 'avatarUrl'>) => {
-        if ('id' in userData) {
-            mockData.updateUser(userData);
+    const handleSaveUser = (userData: UserSubmitData) => {
+        const { avatarFile, ...restUserData } = userData;
+        const lowerCaseEmail = ('email' in restUserData ? restUserData.email : '').toLowerCase();
+
+        // Editing User
+        if ('id' in restUserData) {
+            const otherUsers = mockData.users.filter(u => u.id !== restUserData.id);
+            if (otherUsers.some(u => u.email.toLowerCase() === lowerCaseEmail)) {
+                addToast(`O e-mail ${restUserData.email} já está em uso por outro usuário.`, 'error');
+                return;
+            }
+            
+            const userToUpdate = mockData.users.find(u => u.id === restUserData.id)!;
+            const updatedUser: User = {
+                ...userToUpdate,
+                ...restUserData,
+                avatarUrl: avatarFile ? URL.createObjectURL(avatarFile) : userToUpdate.avatarUrl,
+            };
+            mockData.updateUser(updatedUser);
+            addToast(`Usuário ${restUserData.name} atualizado com sucesso.`);
+        
+        // Creating User
         } else {
-            mockData.addUser(userData);
+             if (mockData.users.some(u => u.email.toLowerCase() === lowerCaseEmail)) {
+                addToast(`O e-mail ${restUserData.email} já está em uso.`, 'error');
+                return;
+            }
+            
+            const userToCreate = {
+                ...restUserData,
+                avatarUrl: avatarFile ? URL.createObjectURL(avatarFile) : undefined,
+            };
+            mockData.addUser(userToCreate);
+            addToast(`Um e-mail de boas-vindas foi enviado para ${restUserData.email}.`);
         }
+
         setCreateUserModalOpen(false);
         setUserToEdit(null);
     };
@@ -99,9 +166,21 @@ const App: React.FC = () => {
         setCreateUserModalOpen(true);
     };
 
+     const handleUpdateCurrentUserAvatar = (file: File) => {
+        if (currentUser) {
+            const newAvatarUrl = URL.createObjectURL(file);
+            const updatedUser = { ...currentUser, avatarUrl: newAvatarUrl };
+            mockData.updateUser(updatedUser);
+            setCurrentUser(updatedUser); // Update state for immediate reflection
+            addToast('Foto de perfil atualizada com sucesso!');
+        }
+    };
+
     const handleSaveAudit = (auditData: Omit<Audit, 'id' | 'findings' | 'status' | 'code'>) => {
         mockData.addAudit(auditData);
         setCreateAuditModalOpen(false);
+        const auditorName = mockData.users.find(u => u.id === auditData.auditorId)?.name || 'O auditor';
+        addToast(`Auditoria agendada. ${auditorName} será notificado por e-mail.`);
     };
     
     const handleSaveGrid = (gridData: AuditGrid | Omit<AuditGrid, 'id'>) => {
@@ -146,6 +225,11 @@ const App: React.FC = () => {
     
     const handleSaveActionPlan = (planData: Omit<ActionPlan, 'id'> | ActionPlan) => {
         mockData.saveActionPlan(planData);
+        const responsibleUser = mockData.users.find(u => u.id === planData.who);
+        const message = 'id' in planData
+            ? `Plano de ação atualizado. ${responsibleUser?.name || 'O responsável'} será notificado.`
+            : `Plano de ação criado. ${responsibleUser?.name || 'O responsável'} será notificado por e-mail.`;
+        addToast(message);
         setCreateActionPlanModalOpen(false);
         setActionPlanToEdit(null);
         setCurrentFindingIdForActionPlan(null);
@@ -257,6 +341,7 @@ const App: React.FC = () => {
                     currentUser={currentUser}
                     onLogout={handleLogout}
                     onBack={selectedAuditId ? handleBackToAudits : undefined}
+                    onUpdateAvatar={handleUpdateCurrentUserAvatar}
                 />
                 <main className="flex-1 overflow-y-auto">
                     <div className="container mx-auto p-4 md:p-6 h-full">
@@ -264,11 +349,14 @@ const App: React.FC = () => {
                     </div>
                 </main>
             </div>
+
+            {/* Modals */}
             <CreateUserModal
                 isOpen={isCreateUserModalOpen}
                 onClose={() => { setCreateUserModalOpen(false); setUserToEdit(null); }}
                 onSubmit={handleSaveUser}
                 userToEdit={userToEdit}
+                allUsers={mockData.users}
             />
             <CreateAuditModal
                 isOpen={isCreateAuditModalOpen}
@@ -296,6 +384,17 @@ const App: React.FC = () => {
                 onClose={() => setReportData(null)}
                 data={reportData}
             />
+             {/* Toast Container */}
+            <div className="fixed bottom-4 right-4 z-[100] w-full max-w-sm space-y-3">
+                {toasts.map(toast => (
+                    <Toast
+                        key={toast.id}
+                        message={toast.message}
+                        type={toast.type}
+                        onClose={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                    />
+                ))}
+            </div>
         </div>
     );
 };

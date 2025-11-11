@@ -2,6 +2,7 @@ import React from 'react';
 import type { Audit, AuditGrid, User, ActionPlan } from '../types';
 import { FindingStatus, TaskStatus } from '../types';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { UserAvatar } from './UserAvatar';
 
 interface ReportModalProps {
     isOpen: boolean;
@@ -36,7 +37,7 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title
 const DetailItem: React.FC<{ label: string; value: string | React.ReactNode }> = ({ label, value }) => (
     <div>
         <p className="text-sm font-semibold text-gray-600">{label}</p>
-        <p className="text-base text-gray-800">{value}</p>
+        <div className="text-base text-gray-800 flex items-center gap-2 mt-1">{value}</div>
     </div>
 );
 
@@ -55,7 +56,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, data 
         .map(([name, value]) => ({ name, value }))
         .filter(item => item.value > 0);
     
-    const findUserName = (id: string) => users.find(u => u.id === id)?.name || 'N/A';
+    const findUser = (id: string) => users.find(u => u.id === id);
     
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 print:hidden">
@@ -81,7 +82,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, data 
                     <Section title="Resumo da Auditoria">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <DetailItem label="Escopo" value={audit.scope} />
-                            <DetailItem label="Auditor" value={auditor?.name || 'N/A'} />
+                            <DetailItem label="Auditor" value={<>{auditor && <UserAvatar user={auditor} size="sm" />} <span>{auditor?.name || 'N/A'}</span></>} />
                             <DetailItem label="Período" value={`${new Date(audit.startDate).toLocaleDateString('pt-BR')} - ${new Date(audit.endDate).toLocaleDateString('pt-BR')}`} />
                             <DetailItem label="Status Final" value={<span className="font-bold">{audit.status}</span>} />
                         </div>
@@ -132,21 +133,24 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, data 
                     {actionPlans.length > 0 && (
                         <Section title="Planos de Ação">
                             <div className="space-y-4">
-                                {actionPlans.map(plan => (
-                                    <div key={plan.id} className="border p-4 rounded-md page-break">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h4 className="font-semibold">{plan.what}</h4>
-                                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${TASK_STATUS_CLASSES[plan.status]}`}>{plan.status}</span>
+                                {actionPlans.map(plan => {
+                                    const responsibleUser = findUser(plan.who);
+                                    return (
+                                        <div key={plan.id} className="border p-4 rounded-md page-break">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h4 className="font-semibold">{plan.what}</h4>
+                                                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${TASK_STATUS_CLASSES[plan.status]}`}>{plan.status}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-500 mb-2">Referente ao achado: {audit.findings.find(f => f.id === plan.findingId)?.title}</p>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                                                <DetailItem label="Responsável" value={<>{responsibleUser && <UserAvatar user={responsibleUser} size="xs" />} <span>{responsibleUser?.name || 'N/A'}</span></>} />
+                                                <DetailItem label="Prazo" value={new Date(plan.when).toLocaleDateString('pt-BR')} />
+                                                <DetailItem label="Onde" value={plan.where} />
+                                                <DetailItem label="Custo" value={plan.howMuch ? `R$${plan.howMuch.toFixed(2)}` : 'N/A'} />
+                                            </div>
                                         </div>
-                                        <p className="text-sm text-gray-500 mb-2">Referente ao achado: {audit.findings.find(f => f.id === plan.findingId)?.title}</p>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                                            <DetailItem label="Responsável" value={findUserName(plan.who)} />
-                                            <DetailItem label="Prazo" value={new Date(plan.when).toLocaleDateString('pt-BR')} />
-                                            <DetailItem label="Onde" value={plan.where} />
-                                            <DetailItem label="Custo" value={plan.howMuch ? `R$${plan.howMuch.toFixed(2)}` : 'N/A'} />
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </Section>
                     )}
