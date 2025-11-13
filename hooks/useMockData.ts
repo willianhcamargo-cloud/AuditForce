@@ -423,53 +423,52 @@ export const useMockData = () => {
     
     const savePolicy = useCallback((policyData: Omit<Policy, 'id' | 'version' | 'createdAt' | 'updatedAt'> | Policy) => {
         const now = new Date().toISOString();
+
         if ('id' in policyData) {
             // Editing existing policy
             const existingPolicy = policies.find(p => p.id === policyData.id);
             if (!existingPolicy) return;
-            
-            let shouldBumpVersion = false;
 
-            // 1. Check for changes in main fields (title, category, content)
-            if (
-                policyData.title !== existingPolicy.title ||
-                policyData.category !== existingPolicy.category ||
-                policyData.content !== existingPolicy.content
-            ) {
-                shouldBumpVersion = true;
-            }
+            const areIndicatorsDifferent = (
+                oldIndicators: PerformanceIndicator[], 
+                newIndicators: PerformanceIndicator[]
+            ): boolean => {
+                if (oldIndicators.length !== newIndicators.length) {
+                    return true;
+                }
 
-            // 2. Check for changes in performance indicators if version hasn't been bumped yet
-            if (!shouldBumpVersion) {
-                const newIndicators = policyData.performanceIndicators;
-                const oldIndicators = existingPolicy.performanceIndicators;
+                const oldMap = new Map<string, PerformanceIndicator>(oldIndicators.map(i => [i.id, i]));
 
-                // Bump version if the number of indicators changes
-                if (newIndicators.length !== oldIndicators.length) {
-                    shouldBumpVersion = true;
-                } else {
-                    // If lengths are the same, check for modifications in existing indicators
-// FIX: Explicitly type the Map to ensure `get` returns a correctly typed object, resolving the 'unknown' type error.
-                    const oldIndicatorsMap = new Map<string, PerformanceIndicator>(oldIndicators.map(i => [i.id, i]));
-                    
-                    for (const newIndicator of newIndicators) {
-                        const oldIndicator = oldIndicatorsMap.get(newIndicator.id);
-                        
-                        // If an indicator was replaced (new ID) or modified, bump version.
-                        // We compare every field EXCEPT 'actualValue'.
-                        if (
-                            !oldIndicator ||
-                            newIndicator.objective !== oldIndicator.objective ||
-                            newIndicator.department !== oldIndicator.department ||
-                            newIndicator.responsibleId !== oldIndicator.responsibleId ||
-                            newIndicator.goal !== oldIndicator.goal
-                        ) {
-                            shouldBumpVersion = true;
-                            break; // A change was found, no need to check further
-                        }
+                for (const newIndicator of newIndicators) {
+                    const oldIndicator = oldMap.get(newIndicator.id);
+
+                    // If an indicator with a new ID is found, it means one was replaced.
+                    if (!oldIndicator) {
+                        return true;
+                    }
+
+                    // Explicitly compare the fields that should trigger a version change.
+                    // The user specified: Objetivo, Responsável, Meta.
+                    // We also check 'department' (Setor) as it's a structural field.
+                    // CRUCIALLY, we ignore 'actualValue' (Real).
+                    if (
+                        newIndicator.objective !== oldIndicator.objective ||
+                        newIndicator.department !== oldIndicator.department ||
+                        newIndicator.responsibleId !== oldIndicator.responsibleId ||
+                        newIndicator.goal !== oldIndicator.goal
+                    ) {
+                        return true;
                     }
                 }
-            }
+
+                return false;
+            };
+            
+            const shouldBumpVersion = 
+                policyData.title !== existingPolicy.title ||
+                policyData.category !== existingPolicy.category ||
+                policyData.content !== existingPolicy.content ||
+                areIndicatorsDifferent(existingPolicy.performanceIndicators, policyData.performanceIndicators);
 
             let newVersion = existingPolicy.version;
             if (shouldBumpVersion) {
