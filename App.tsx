@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback } from 'react';
 import { useMockData } from './hooks/useMockData';
 import type { User, Audit, AuditGrid, ActionPlan, Finding, AuditStatus, Policy, Meeting, PerformanceIndicator, TaskStatus } from './types';
@@ -26,6 +27,7 @@ import { ViewPolicyModal } from './components/ViewPolicyModal';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { CreateMeetingModal } from './components/CreateMeetingModal';
 import { MeetingConfirmationModal } from './components/MeetingConfirmationModal';
+import { VersionConfirmationModal } from './components/VersionConfirmationModal';
 
 
 type Page = 'dashboard' | 'audits' | 'grids' | 'users' | 'chatbot' | 'policies';
@@ -37,6 +39,7 @@ interface ToastMessage {
 }
 
 export type UserSubmitData = (Omit<User, 'id' | 'avatarUrl' | 'status'> | Omit<User, 'avatarUrl' | 'status'>) & { avatarFile?: File | null };
+type PolicySubmitData = Omit<Policy, 'id' | 'version' | 'createdAt' | 'updatedAt' | 'changeHistory'> | Policy;
 
 
 const App: React.FC = () => {
@@ -64,6 +67,7 @@ const App: React.FC = () => {
     const [defaultMeetingDate, setDefaultMeetingDate] = useState<string | null>(null);
     const [invitationDetails, setInvitationDetails] = useState<{ content: string; filename: string; mailtoUrl: string } | null>(null);
     const [meetingToCancel, setMeetingToCancel] = useState<Meeting | null>(null);
+    const [versionConfirmState, setVersionConfirmState] = useState<{ policyData: PolicySubmitData, isOpen: boolean } | null>(null);
     const [reportData, setReportData] = useState<{
         audit: Audit;
         grid: AuditGrid;
@@ -297,11 +301,101 @@ const App: React.FC = () => {
         });
     };
 
-    const handleSavePolicy = (policyData: Omit<Policy, 'id' | 'version' | 'createdAt' | 'updatedAt'> | Policy) => {
-        mockData.savePolicy(policyData);
+    const handleSavePolicy = (policyData: PolicySubmitData) => {
+        if (!currentUser) return;
+    
+        // If it's a new policy, save directly.
+        if (!('id' in policyData)) {
+            mockData.savePolicy(policyData, { authorId: currentUser.id });
+            addToast(`Política "${policyData.title}" criada com sucesso.`);
+            setCreatePolicyModalOpen(false);
+            setPolicyToEdit(null);
+            return;
+        }
+    
+        // If it's an existing policy, check for changes robustly.
+        const originalPolicy = mockData.policies.find(p => p.id === policyData.id);
+        if (!originalPolicy) {
+             addToast(`Erro: Política original não encontrada.`, 'error');
+             setCreatePolicyModalOpen(false);
+             setPolicyToEdit(null);
+             return;
+        }
+
+        let hasChanged = false;
+
+        // 1. Check top-level fields
+        if (
+            originalPolicy.title !== policyData.title ||
+            originalPolicy.category !== policyData.category ||
+            originalPolicy.status !== policyData.status ||
+            originalPolicy.content !== policyData.content
+        ) {
+            hasChanged = true;
+        }
+
+        // 2. Check performance indicators for changes
+        if (!hasChanged) {
+            const originalIndicators = originalPolicy.performanceIndicators;
+            const newIndicators = (policyData as Policy).performanceIndicators;
+
+            if (originalIndicators.length !== newIndicators.length) {
+                hasChanged = true;
+            } else {
+                const oldIndicatorsMap = new Map(
+                    originalIndicators.map(ind => [ind.id, ind])
+                );
+
+                // FIX: Cast the array in the loop to ensure correct type inference for `newIndicator`.
+                for (const newIndicator of newIndicators as PerformanceIndicator[]) {
+                    const oldIndicator = oldIndicatorsMap.get(newIndicator.id);
+
+                    if (!oldIndicator) {
+                        // This means an indicator was replaced (new ID), which is a change.
+                        hasChanged = true;
+                        break;
+                    }
+
+                    if (
+                        oldIndicator.objective !== newIndicator.objective ||
+                        oldIndicator.department !== newIndicator.department ||
+                        oldIndicator.responsibleId !== newIndicator.responsibleId ||
+                        oldIndicator.goal !== newIndicator.goal ||
+                        oldIndicator.actualValue !== newIndicator.actualValue
+                    ) {
+                        hasChanged = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (hasChanged) {
+            setVersionConfirmState({ policyData, isOpen: true });
+        }
+    
+        // Close the editor modal. The version modal will open if needed.
         setCreatePolicyModalOpen(false);
         setPolicyToEdit(null);
-        addToast(`Política "${policyData.title}" salva com sucesso.`);
+    };
+    
+    const handleConfirmVersionedSave = (decision: 'new' | 'update', changeDescription?: string) => {
+        if (!versionConfirmState || !currentUser) return;
+
+        const { policyData } = versionConfirmState;
+
+        mockData.savePolicy(policyData, {
+            createNewVersion: decision === 'new',
+            changeDescription: changeDescription,
+            authorId: currentUser.id
+        });
+
+        const message = decision === 'new'
+            ? `Nova versão da política "${policyData.title}" foi criada.`
+            : `Política "${policyData.title}" atualizada com sucesso.`;
+        addToast(message);
+
+        setVersionConfirmState(null);
     };
 
     const handleConfirmDeletePolicy = () => {
@@ -517,6 +611,11 @@ ${currentUser.name}`
                 onAddFollowUp={handleAddFollowUp}
                 onUpdateActionPlanStatus={handleUpdateActionPlanStatus}
                 currentUser={currentUser}
+            />
+             <VersionConfirmationModal
+                isOpen={versionConfirmState?.isOpen || false}
+                onClose={() => setVersionConfirmState(null)}
+                onConfirm={handleConfirmVersionedSave}
             />
             <CreateActionPlanModal
                 isOpen={isCreateActionPlanModalOpen}

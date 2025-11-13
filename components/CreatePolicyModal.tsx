@@ -7,7 +7,7 @@ const generateLocalId = () => `temp-${Math.random().toString(36).substring(2, 9)
 interface CreatePolicyModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (policyData: Omit<Policy, 'id' | 'version' | 'createdAt' | 'updatedAt'> | Policy) => void;
+    onSave: (policyData: Omit<Policy, 'id' | 'version' | 'createdAt' | 'updatedAt' | 'changeHistory'> | Policy) => void;
     policyToEdit?: Policy | null;
     users: User[];
 }
@@ -28,7 +28,9 @@ export const CreatePolicyModal: React.FC<CreatePolicyModalProps> = ({ isOpen, on
                 setCategory(policyToEdit.category);
                 setContent(policyToEdit.content);
                 setStatus(policyToEdit.status);
-                setIndicators(policyToEdit.performanceIndicators);
+                // FIX: Deep copy indicators to prevent mutating the original state.
+                // This ensures the change detection logic in the parent component works correctly.
+                setIndicators(policyToEdit.performanceIndicators.map(ind => ({ ...ind })));
             } else {
                 setTitle('');
                 setCategory('');
@@ -40,9 +42,12 @@ export const CreatePolicyModal: React.FC<CreatePolicyModalProps> = ({ isOpen, on
     }, [isOpen, policyToEdit, isEditing]);
 
     const handleIndicatorChange = (index: number, field: keyof Omit<PerformanceIndicator, 'id'>, value: string | number) => {
-        const newIndicators = [...indicators];
-        (newIndicators[index] as any)[field] = value;
-        setIndicators(newIndicators);
+        // FIX: Ensure state updates are immutable to prevent side effects.
+        setIndicators(currentIndicators =>
+            currentIndicators.map((indicator, i) =>
+                i === index ? { ...indicator, [field]: value } : indicator
+            )
+        );
     };
 
     const handleAddIndicator = () => {
@@ -68,7 +73,7 @@ export const CreatePolicyModal: React.FC<CreatePolicyModalProps> = ({ isOpen, on
             performanceIndicators: indicators,
         };
 
-        if (isEditing) {
+        if (isEditing && policyToEdit) {
             onSave({ ...policyToEdit, ...policyData });
         } else {
             onSave(policyData);

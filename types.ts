@@ -110,6 +110,13 @@ export interface PerformanceIndicator {
     actualValue: number;
 }
 
+export interface ChangeHistoryEntry {
+    version: string;
+    updatedAt: string;
+    description: string;
+    authorId: string;
+}
+
 export interface Policy {
     id: string;
     title: string;
@@ -120,6 +127,7 @@ export interface Policy {
     createdAt: string; // ISO date string
     updatedAt: string; // ISO date string
     performanceIndicators: PerformanceIndicator[];
+    changeHistory: ChangeHistoryEntry[];
 }
 
 export interface Meeting {

@@ -1,7 +1,7 @@
 // FIX: Replaced placeholder content with a full implementation of the useMockData hook.
 import { useState, useCallback } from 'react';
 import { FindingStatus, TaskStatus } from '../types';
-import type { User, Audit, AuditGrid, ActionPlan, Finding, AuditStatus, Attachment, Policy, PolicyStatus, PerformanceIndicator, Meeting, Notification, FollowUp } from '../types';
+import type { User, Audit, AuditGrid, ActionPlan, Finding, AuditStatus, Attachment, Policy, PolicyStatus, PerformanceIndicator, Meeting, Notification, FollowUp, ChangeHistoryEntry } from '../types';
 
 // Simple ID generator
 const generateId = () => Math.random().toString(36).substring(2, 11);
@@ -115,6 +115,10 @@ const initialPolicies: Policy[] = [
                 goal: 15,
                 actualValue: 10,
             }
+        ],
+        changeHistory: [
+            { version: '2.1', updatedAt: '2023-08-20T14:30:00Z', description: 'Revisão anual e ajuste de metas.', authorId: 'user-1' },
+            { version: '2.0', updatedAt: '2022-01-15T09:00:00Z', description: 'Versão inicial publicada.', authorId: 'user-1' }
         ]
     },
     {
@@ -135,6 +139,9 @@ const initialPolicies: Policy[] = [
                 goal: 100,
                 actualValue: 95,
             }
+        ],
+        changeHistory: [
+             { version: '1.0', updatedAt: '2023-03-10T11:00:00Z', description: 'Versão inicial publicada.', authorId: 'user-3' }
         ]
     },
      {
@@ -155,7 +162,8 @@ const initialPolicies: Policy[] = [
                 goal: 100,
                 actualValue: 0,
             }
-        ]
+        ],
+        changeHistory: []
     },
 ];
 
@@ -421,7 +429,7 @@ export const useMockData = () => {
         }
     }, [audits, users]);
     
-    const savePolicy = useCallback((policyData: Omit<Policy, 'id' | 'version' | 'createdAt' | 'updatedAt'> | Policy) => {
+    const savePolicy = useCallback((policyData: Omit<Policy, 'id' | 'version' | 'createdAt' | 'updatedAt' | 'changeHistory'> | Policy, options: { createNewVersion?: boolean; changeDescription?: string; authorId?: string } = {}) => {
         const now = new Date().toISOString();
 
         if ('id' in policyData) {
@@ -429,74 +437,61 @@ export const useMockData = () => {
             const existingPolicy = policies.find(p => p.id === policyData.id);
             if (!existingPolicy) return;
 
-            const areIndicatorsDifferent = (
-                oldIndicators: PerformanceIndicator[], 
-                newIndicators: PerformanceIndicator[]
-            ): boolean => {
-                if (oldIndicators.length !== newIndicators.length) {
-                    return true;
-                }
+            let updatedPolicy: Policy;
 
-                const oldMap = new Map<string, PerformanceIndicator>(oldIndicators.map(i => [i.id, i]));
-
-                for (const newIndicator of newIndicators) {
-                    const oldIndicator = oldMap.get(newIndicator.id);
-
-                    // If an indicator with a new ID is found, it means one was replaced.
-                    if (!oldIndicator) {
-                        return true;
-                    }
-
-                    // Explicitly compare the fields that should trigger a version change.
-                    // The user specified: Objetivo, Responsável, Meta.
-                    // We also check 'department' (Setor) as it's a structural field.
-                    // CRUCIALLY, we ignore 'actualValue' (Real).
-                    if (
-                        newIndicator.objective !== oldIndicator.objective ||
-                        newIndicator.department !== oldIndicator.department ||
-                        newIndicator.responsibleId !== oldIndicator.responsibleId ||
-                        newIndicator.goal !== oldIndicator.goal
-                    ) {
-                        return true;
-                    }
-                }
-
-                return false;
-            };
-            
-            const shouldBumpVersion = 
-                policyData.title !== existingPolicy.title ||
-                policyData.category !== existingPolicy.category ||
-                policyData.content !== existingPolicy.content ||
-                areIndicatorsDifferent(existingPolicy.performanceIndicators, policyData.performanceIndicators);
-
-            let newVersion = existingPolicy.version;
-            if (shouldBumpVersion) {
-                // Save the old version to history before updating
+            if (options.createNewVersion && options.authorId) {
+                 // Save the old version to history before updating
                 setPolicyHistory(current => [...current, existingPolicy]);
 
                 // Increment the minor version number (e.g., 1.0 -> 1.1)
                 const versionParts = existingPolicy.version.split('.').map(Number);
                 versionParts[1] = (versionParts[1] || 0) + 1;
-                newVersion = versionParts.join('.');
+                const newVersion = versionParts.join('.');
+
+                const newHistoryEntry: ChangeHistoryEntry = {
+                    version: newVersion,
+                    updatedAt: now,
+                    description: options.changeDescription || 'Alterações gerais.',
+                    authorId: options.authorId,
+                };
+
+                 updatedPolicy = {
+                    ...existingPolicy,
+                    ...policyData,
+                    version: newVersion,
+                    updatedAt: now,
+                    changeHistory: [newHistoryEntry, ...existingPolicy.changeHistory],
+                };
+            } else {
+                // Just update the current version
+                updatedPolicy = {
+                    ...existingPolicy,
+                    ...policyData,
+                    updatedAt: now,
+                };
             }
             
-            const updatedPolicy: Policy = {
-                ...existingPolicy,
-                ...policyData,
-                version: newVersion,
-                updatedAt: now,
-            };
             setPolicies(current => current.map(p => (p.id === updatedPolicy.id ? updatedPolicy : p)));
 
         } else {
             // Creating a new policy
+             if (!options.authorId) throw new Error("Author ID is required for creating a new policy");
+
+            const newVersion = '1.0';
+            const initialHistoryEntry: ChangeHistoryEntry = {
+                version: newVersion,
+                updatedAt: now,
+                description: 'Versão inicial criada.',
+                authorId: options.authorId,
+            };
+
             const newPolicy: Policy = {
                 id: generateId(),
-                version: '1.0',
+                version: newVersion,
                 createdAt: now,
                 updatedAt: now,
                 ...policyData,
+                changeHistory: [initialHistoryEntry]
             };
             setPolicies(current => [...current, newPolicy]);
         }

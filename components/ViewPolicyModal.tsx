@@ -193,6 +193,31 @@ export const ViewPolicyModal: React.FC<ViewPolicyModalProps> = ({ isOpen, onClos
                             ) : (
                                 <p className="text-sm text-gray-500 italic bg-gray-50 p-4 rounded-md border">Nenhum indicador de performance definido para esta política.</p>
                             )}
+
+                             <h3 className="text-lg font-bold my-4 pt-4 border-t text-gray-800">Histórico de Alterações</h3>
+                            {viewedPolicy.changeHistory && viewedPolicy.changeHistory.length > 0 ? (
+                                <div className="space-y-4">
+                                    {viewedPolicy.changeHistory.map(entry => {
+                                        const author = users.find(u => u.id === entry.authorId);
+                                        return (
+                                            <div key={entry.version} className="flex items-start gap-4 p-3 bg-gray-50 rounded-md border">
+                                                <div className="flex-shrink-0 text-center">
+                                                    <span className="font-mono bg-gray-200 text-gray-700 text-xs font-bold px-2 py-1 rounded">v{entry.version}</span>
+                                                </div>
+                                                <div className="flex-grow">
+                                                    <p className="text-sm text-gray-800">{entry.description}</p>
+                                                    <div className="flex items-center text-xs text-gray-500 mt-1">
+                                                        {author && <UserAvatar user={author} size="xs" />}
+                                                        <span className="ml-2">{author?.name || 'Sistema'} em {new Date(entry.updatedAt).toLocaleString('pt-BR')}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-500 italic bg-gray-50 p-4 rounded-md border">Nenhum histórico de alterações disponível para esta versão.</p>
+                            )}
                         </div>
                     </div>
                 </div>
