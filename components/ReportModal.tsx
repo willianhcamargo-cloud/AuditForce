@@ -1,8 +1,11 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import type { Audit, AuditGrid, User, ActionPlan } from '../types';
 import { FindingStatus, TaskStatus } from '../types';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { UserAvatar } from './UserAvatar';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface ReportModalProps {
     isOpen: boolean;
@@ -22,8 +25,9 @@ const FINDING_COLORS = {
     [FindingStatus.NotApplicable]: '#9CA3AF',
 };
 const TASK_STATUS_CLASSES: Record<TaskStatus, string> = {
-    [TaskStatus.ToDo]: 'bg-yellow-100 text-yellow-800',
+    [TaskStatus.Pending]: 'bg-yellow-100 text-yellow-800',
     [TaskStatus.InProgress]: 'bg-blue-100 text-blue-800',
+    [TaskStatus.Standby]: 'bg-gray-100 text-gray-800',
     [TaskStatus.Done]: 'bg-green-100 text-green-800',
 };
 
@@ -42,6 +46,85 @@ const DetailItem: React.FC<{ label: string; value: string | React.ReactNode }> =
 );
 
 export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, data }) => {
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    const handleDownloadPdf = async () => {
+        const reportContentElement = document.getElementById('report-content');
+        if (!reportContentElement || !data) return;
+    
+        setIsDownloading(true);
+    
+        // Get the original width to maintain the layout in the clone.
+        const originalWidth = reportContentElement.offsetWidth;
+        
+        // Create a container for a clone of the report content.
+        // This container will be positioned off-screen.
+        const printContainer = document.createElement('div');
+        printContainer.style.position = 'absolute';
+        printContainer.style.left = '-9999px';
+        printContainer.style.top = '0px';
+        printContainer.style.width = `${originalWidth}px`;
+        
+        // Clone the report content.
+        const clone = reportContentElement.cloneNode(true) as HTMLElement;
+    
+        // Append the clone to the container, and the container to the body.
+        printContainer.appendChild(clone);
+        document.body.appendChild(printContainer);
+    
+        try {
+            // Run html2canvas on the off-screen, fully rendered clone.
+            const canvas = await html2canvas(clone, {
+                scale: 2, // Use a higher scale for better resolution.
+                useCORS: true,
+                logging: false,
+            });
+    
+            // The rest of the PDF generation logic remains largely the same.
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+    
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+    
+            const imgProps = pdf.getImageProperties(imgData);
+            const imgWidth = imgProps.width;
+            const imgHeight = imgProps.height;
+            
+            // Calculate the height of the image in the PDF, maintaining aspect ratio.
+            const ratio = imgWidth / pdfWidth;
+            const pdfImageHeight = imgHeight / ratio;
+    
+            let heightLeft = pdfImageHeight;
+            let position = 0;
+    
+            // Add the first page.
+            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfImageHeight);
+            heightLeft -= pdfHeight;
+    
+            // Loop to add new pages if the content is taller than one page.
+            while (heightLeft > 0) {
+                position -= pdfHeight; // Move the image "up" to show the next part.
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfImageHeight);
+                heightLeft -= pdfHeight;
+            }
+    
+            // Open the generated PDF in a new browser tab.
+            const pdfBlob = pdf.output('blob');
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            window.open(pdfUrl, '_blank');
+    
+        } catch (error) {
+            console.error("Erro ao gerar o PDF:", error);
+            alert("Ocorreu um erro ao gerar o PDF. Por favor, tente novamente.");
+        } finally {
+            setIsDownloading(false);
+            // Important: Clean up the DOM by removing the temporary container.
+            document.body.removeChild(printContainer);
+        }
+    };
+    
     if (!isOpen || !data) return null;
 
     const { audit, grid, auditor, actionPlans, users } = data;
@@ -57,6 +140,17 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, data 
         .filter(item => item.value > 0);
     
     const findUser = (id: string) => users.find(u => u.id === id);
+
+    const totalFindings = audit.findings.length;
+    const nonCompliantFindings = findingsByStatus[FindingStatus.NonCompliant];
+    const compliantOrNaFindings = totalFindings - nonCompliantFindings;
+    const compliancePercentage = totalFindings > 0 ? (compliantOrNaFindings / totalFindings) * 100 : 100;
+
+    const getComplianceColor = (percentage: number) => {
+        if (percentage >= 90) return 'text-green-600';
+        if (percentage >= 70) return 'text-yellow-600';
+        return 'text-red-600';
+    };
     
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 print:hidden">
@@ -80,11 +174,19 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, data 
 
                     {/* Summary Section */}
                     <Section title="Resumo da Auditoria">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                             <DetailItem label="Escopo" value={audit.scope} />
                             <DetailItem label="Auditor" value={<>{auditor && <UserAvatar user={auditor} size="sm" />} <span>{auditor?.name || 'N/A'}</span></>} />
                             <DetailItem label="Período" value={`${new Date(audit.startDate).toLocaleDateString('pt-BR')} - ${new Date(audit.endDate).toLocaleDateString('pt-BR')}`} />
                             <DetailItem label="Status Final" value={<span className="font-bold">{audit.status}</span>} />
+                            <DetailItem 
+                                label="Percentual de Conformidade" 
+                                value={
+                                    <span className={`font-bold text-lg ${getComplianceColor(compliancePercentage)}`}>
+                                        {compliancePercentage.toFixed(1)}%
+                                    </span>
+                                } 
+                            />
                         </div>
                     </Section>
 
@@ -154,6 +256,18 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, data 
                             </div>
                         </Section>
                     )}
+                </div>
+                 <div className="p-4 bg-gray-50 border-t flex justify-end">
+                    <button 
+                        onClick={handleDownloadPdf} 
+                        disabled={isDownloading}
+                        className="bg-primary text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-400 flex items-center"
+                    >
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        {isDownloading ? 'Gerando...' : 'Visualizar PDF'}
+                    </button>
                 </div>
             </div>
         </div>

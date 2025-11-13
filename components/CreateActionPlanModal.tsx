@@ -6,13 +6,14 @@ import { TaskStatus } from '../types';
 interface CreateActionPlanModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (planData: Omit<ActionPlan, 'id'> | ActionPlan) => void;
+    onSave: (planData: Omit<ActionPlan, 'id' | 'followUps'> | ActionPlan) => void;
     users: User[];
     findingId: string | null;
+    performanceIndicatorId?: string | null;
     planToEdit?: ActionPlan | null;
 }
 
-export const CreateActionPlanModal: React.FC<CreateActionPlanModalProps> = ({ isOpen, onClose, onSave, users, findingId, planToEdit }) => {
+export const CreateActionPlanModal: React.FC<CreateActionPlanModalProps> = ({ isOpen, onClose, onSave, users, findingId, performanceIndicatorId, planToEdit }) => {
     const [what, setWhat] = useState('');
     const [why, setWhy] = useState('');
     const [where, setWhere] = useState('');
@@ -21,7 +22,7 @@ export const CreateActionPlanModal: React.FC<CreateActionPlanModalProps> = ({ is
     const [how, setHow] = useState('');
     // FIX: Change state type to string to correctly handle input value.
     const [howMuch, setHowMuch] = useState<string>('');
-    const [status, setStatus] = useState<TaskStatus>(TaskStatus.ToDo);
+    const [status, setStatus] = useState<TaskStatus>(TaskStatus.Pending);
 
     const isEditing = !!planToEdit;
 
@@ -46,7 +47,7 @@ export const CreateActionPlanModal: React.FC<CreateActionPlanModalProps> = ({ is
                 setWho('');
                 setHow('');
                 setHowMuch('');
-                setStatus(TaskStatus.ToDo);
+                setStatus(TaskStatus.Pending);
             }
         }
     }, [isOpen, planToEdit]);
@@ -72,11 +73,12 @@ export const CreateActionPlanModal: React.FC<CreateActionPlanModalProps> = ({ is
                 ...commonData,
                 status,
             });
-        } else if (findingId) {
-            onSave({
+        } else {
+             onSave({
                 ...commonData,
-                findingId,
-                status: TaskStatus.ToDo,
+                findingId: findingId ?? undefined,
+                performanceIndicatorId: performanceIndicatorId ?? undefined,
+                status: TaskStatus.Pending,
             });
         }
         
@@ -137,8 +139,9 @@ export const CreateActionPlanModal: React.FC<CreateActionPlanModalProps> = ({ is
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
                                     <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
-                                        <option value={TaskStatus.ToDo}>A Fazer</option>
-                                        <option value={TaskStatus.InProgress}>Em Progresso</option>
+                                        <option value={TaskStatus.Pending}>Pendente</option>
+                                        <option value={TaskStatus.InProgress}>Em Execução</option>
+                                        <option value={TaskStatus.Standby}>Standby</option>
                                         <option value={TaskStatus.Done}>Concluído</option>
                                     </select>
                                 </div>

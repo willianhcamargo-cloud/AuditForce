@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Audit, ActionPlan, User, AuditStatus } from '../types';
 import { TaskStatus, FindingStatus } from '../types';
@@ -25,10 +26,11 @@ const FINDING_COLORS = {
     [FindingStatus.NonCompliant]: '#EF4444', // red-500
 };
 
-const ACTION_PLAN_COLORS = {
-    [TaskStatus.ToDo]: '#F59E0B', // amber-500
+const ACTION_PLAN_COLORS: Record<TaskStatus, string> = {
+    [TaskStatus.Pending]: '#F59E0B',   // amber-500
     [TaskStatus.InProgress]: '#3B82F6', // blue-500
-    [TaskStatus.Done]: '#10B981', // green-500
+    [TaskStatus.Standby]: '#6B7280',    // gray-500
+    [TaskStatus.Done]: '#10B981',       // green-500
 };
 
 const AUDIT_STATUS_COLORS: Record<AuditStatus, string> = {
@@ -116,15 +118,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ audits, actionPlans, curre
     }, [filteredAudits]);
 
     const actionPlansStatusData = useMemo(() => {
-        const todo = filteredActionPlans.filter(p => p.status === TaskStatus.ToDo).length;
-        const inProgress = filteredActionPlans.filter(p => p.status === TaskStatus.InProgress).length;
-        const done = filteredActionPlans.filter(p => p.status === TaskStatus.Done).length;
-        return [
-            { name: 'A Fazer', value: todo },
-            { name: 'Em Progresso', value: inProgress },
-            { name: 'Concluído', value: done },
-        ];
+        const statusCounts = filteredActionPlans.reduce((acc, plan) => {
+            acc[plan.status] = (acc[plan.status] || 0) + 1;
+            return acc;
+        }, {} as Record<TaskStatus, number>);
+
+        return ([TaskStatus.Pending, TaskStatus.InProgress, TaskStatus.Standby, TaskStatus.Done] as TaskStatus[])
+            .map(status => ({
+                name: status,
+                value: statusCounts[status] || 0,
+            }));
     }, [filteredActionPlans]);
+
 
     return (
         <div className="space-y-6">
@@ -191,10 +196,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ audits, actionPlans, curre
                             <XAxis dataKey="name" stroke={tickColor} />
                             <YAxis allowDecimals={false} stroke={tickColor} />
                             <Tooltip contentStyle={{ backgroundColor: tooltipBg, color: tooltipColor, border: `1px solid ${gridColor}` }} />
-                            <Bar dataKey="value" name="Planos" fill="#8884d8" onClick={handleChartClick} cursor="pointer">
-                                <Cell key={`cell-0`} fill={ACTION_PLAN_COLORS[TaskStatus.ToDo]} />
-                                <Cell key={`cell-1`} fill={ACTION_PLAN_COLORS[TaskStatus.InProgress]} />
-                                <Cell key={`cell-2`} fill={ACTION_PLAN_COLORS[TaskStatus.Done]} />
+                            <Bar dataKey="value" name="Planos" onClick={handleChartClick} cursor="pointer">
+                                {actionPlansStatusData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={ACTION_PLAN_COLORS[entry.name as TaskStatus]} />
+                                ))}
                             </Bar>
                         </BarChart>
                      </ResponsiveContainer>

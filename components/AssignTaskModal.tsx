@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { Task, User } from '../types';
 import { TaskStatus } from '../types';
@@ -24,7 +23,8 @@ export const AssignTaskModal: React.FC<AssignTaskModalProps> = ({ isOpen, onClos
             description,
             assignedTo,
             dueDate,
-            status: TaskStatus.ToDo,
+            // FIX: Replaced TaskStatus.ToDo with TaskStatus.Pending as 'ToDo' does not exist in the enum.
+            status: TaskStatus.Pending,
         });
         onClose();
         // Reset form

@@ -1,16 +1,21 @@
+
 import React, { useState, useRef } from 'react';
-import type { User } from '../types';
+import type { User, Notification } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { UserAvatar } from './UserAvatar';
+import { NotificationBell } from './NotificationBell';
 
 interface HeaderProps {
     currentUser: User;
     onLogout: () => void;
     onBack?: () => void;
     onUpdateAvatar: (file: File) => void;
+    notifications: Notification[];
+    onMarkNotificationRead: (notificationId: string) => void;
+    onMarkAllNotificationsRead: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, onBack, onUpdateAvatar }) => {
+export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, onBack, onUpdateAvatar, notifications, onMarkNotificationRead, onMarkAllNotificationsRead }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const { theme, toggleTheme } = useTheme();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -38,6 +43,11 @@ export const Header: React.FC<HeaderProps> = ({ currentUser, onLogout, onBack, o
                     </div>
 
                     <div className="flex items-center space-x-4">
+                        <NotificationBell
+                            notifications={notifications}
+                            onMarkAsRead={onMarkNotificationRead}
+                            onMarkAllAsRead={onMarkAllNotificationsRead}
+                        />
                         <button
                             onClick={toggleTheme}
                             className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none"

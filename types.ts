@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   name: string;
@@ -9,8 +10,9 @@ export interface User {
 }
 
 export enum TaskStatus {
-    ToDo = 'A Fazer',
-    InProgress = 'Em Progresso',
+    Pending = 'Pendente',
+    InProgress = 'Em Execução',
+    Standby = 'Standby',
     Done = 'Concluído',
 }
 
@@ -23,9 +25,17 @@ export interface Task {
     status: TaskStatus;
 }
 
+export interface FollowUp {
+    id: string;
+    authorId: string; // User ID
+    content: string;
+    timestamp: string; // ISO date string
+}
+
 export interface ActionPlan {
     id: string;
-    findingId: string;
+    findingId?: string; // Made optional
+    performanceIndicatorId?: string; // Added for policies
     what: string;
     why: string;
     where: string;
@@ -34,6 +44,7 @@ export interface ActionPlan {
     how: string;
     howMuch?: number;
     status: TaskStatus;
+    followUps: FollowUp[];
 }
 
 export type AuditStatus = 'Planejando' | 'Em Execução' | 'Plano de Ação' | 'Concluído';
@@ -86,4 +97,47 @@ export interface AuditGrid {
     description: string;
     scope: string;
     requirements: AuditRequirement[];
+}
+
+export type PolicyStatus = 'Rascunho' | 'Publicado' | 'Arquivado';
+
+export interface PerformanceIndicator {
+    id: string;
+    objective: string;
+    department: string;
+    responsibleId: string; // User ID
+    goal: number;
+    actualValue: number;
+}
+
+export interface Policy {
+    id: string;
+    title: string;
+    category: string;
+    version: string;
+    content: string; // Markdown content
+    status: PolicyStatus;
+    createdAt: string; // ISO date string
+    updatedAt: string; // ISO date string
+    performanceIndicators: PerformanceIndicator[];
+}
+
+export interface Meeting {
+    id: string;
+    policyId: string;
+    title: string;
+    description: string;
+    date: string; // YYYY-MM-DD
+    startTime: string; // HH:MM
+    endTime: string; // HH:MM
+    attendeeIds: string[]; // User IDs
+    organizerId: string; // User ID of the creator
+}
+
+export interface Notification {
+    id: string;
+    userId: string;
+    message: string;
+    timestamp: string; // ISO date string
+    read: boolean;
 }

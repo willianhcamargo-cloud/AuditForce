@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import type { ActionPlan, User, Finding } from '../types';
 import { TaskStatus } from '../types';
 import { ActionPlanDetailsModal } from './ActionPlanDetailsModal';
@@ -9,8 +10,10 @@ interface ActionPlanKanbanProps {
     users: User[];
     findings: Finding[];
     onUpdateActionPlanStatus: (planId: string, newStatus: TaskStatus) => void;
+    onAddFollowUp: (planId: string, content: string) => void;
     onEditActionPlan: (plan: ActionPlan) => void;
     isReadOnly: boolean;
+    currentUser: User;
 }
 
 const ActionPlanCard: React.FC<{ plan: ActionPlan; user?: User; finding?: Finding; onDetailsClick: () => void; isReadOnly: boolean; }> = ({ plan, user, finding, onDetailsClick, isReadOnly }) => (
@@ -63,11 +66,13 @@ const KanbanColumn: React.FC<{
         }
     };
 
-    const columnColors: Record<string, string> = {
-        [TaskStatus.ToDo]: 'border-t-yellow-400',
+    const columnColors: Record<TaskStatus, string> = {
+        [TaskStatus.Pending]: 'border-t-yellow-400',
         [TaskStatus.InProgress]: 'border-t-blue-400',
+        [TaskStatus.Standby]: 'border-t-gray-400',
         [TaskStatus.Done]: 'border-t-green-400',
-    }
+    };
+
     return (
         <div 
             onDragOver={handleDragOver}
@@ -91,23 +96,48 @@ const KanbanColumn: React.FC<{
     );
 };
 
-export const ActionPlanKanban: React.FC<ActionPlanKanbanProps> = ({ actionPlans, users, findings, onUpdateActionPlanStatus, onEditActionPlan, isReadOnly }) => {
+export const ActionPlanKanban: React.FC<ActionPlanKanbanProps> = ({ actionPlans, users, findings, onUpdateActionPlanStatus, onAddFollowUp, onEditActionPlan, isReadOnly, currentUser }) => {
     const [selectedPlanDetails, setSelectedPlanDetails] = useState<ActionPlan | null>(null);
 
-    const columns = {
-        [TaskStatus.ToDo]: actionPlans.filter(p => p.status === TaskStatus.ToDo),
-        [TaskStatus.InProgress]: actionPlans.filter(p => p.status === TaskStatus.InProgress),
-        [TaskStatus.Done]: actionPlans.filter(p => p.status === TaskStatus.Done),
-    };
+    // FIX: Add useEffect to listen for changes in actionPlans prop.
+    // This ensures that when a status is updated or a follow-up is added,
+    // the currently viewed plan details are refreshed in real-time.
+    useEffect(() => {
+        if (selectedPlanDetails) {
+            const updatedPlan = actionPlans.find(p => p.id === selectedPlanDetails.id);
+            if (updatedPlan && (
+                updatedPlan.status !== selectedPlanDetails.status ||
+                updatedPlan.followUps.length !== selectedPlanDetails.followUps.length
+            )) {
+                setSelectedPlanDetails(updatedPlan);
+            }
+        }
+    }, [actionPlans, selectedPlanDetails]);
+
+    const columnOrder: TaskStatus[] = [TaskStatus.Pending, TaskStatus.InProgress, TaskStatus.Standby, TaskStatus.Done];
+
+    const columns = useMemo(() => {
+        const grouped = actionPlans.reduce((acc, plan) => {
+            (acc[plan.status] = acc[plan.status] || []).push(plan);
+            return acc;
+        }, {} as Record<TaskStatus, ActionPlan[]>);
+
+        columnOrder.forEach(status => {
+            if (!grouped[status]) {
+                grouped[status] = [];
+            }
+        });
+        return grouped;
+    }, [actionPlans]);
 
     return (
         <div>
             <div className="flex flex-col md:flex-row gap-4">
-                {Object.entries(columns).map(([status, plansInColumn]) => (
+                {columnOrder.map(status => (
                     <KanbanColumn 
                         key={status} 
-                        title={status as TaskStatus} 
-                        plans={plansInColumn} 
+                        title={status} 
+                        plans={columns[status]} 
                         users={users}
                         findings={findings}
                         onDrop={onUpdateActionPlanStatus}
@@ -132,12 +162,16 @@ export const ActionPlanKanban: React.FC<ActionPlanKanbanProps> = ({ actionPlans,
                     plan={selectedPlanDetails}
                     user={users.find(u => u.id === selectedPlanDetails.who)}
                     finding={findings.find(f => f.id === selectedPlanDetails.findingId)}
+                    users={users}
                     onClose={() => setSelectedPlanDetails(null)}
                     onEdit={(plan) => {
                         onEditActionPlan(plan);
                         setSelectedPlanDetails(null);
                     }}
+                    onAddFollowUp={onAddFollowUp}
+                    onUpdateStatus={onUpdateActionPlanStatus}
                     isReadOnly={isReadOnly}
+                    currentUser={currentUser}
                 />
             )}
         </div>

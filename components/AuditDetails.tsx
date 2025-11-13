@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { Audit, AuditGrid, User, Finding, ActionPlan, AuditStatus, Attachment } from '../types';
 import { FindingStatus, TaskStatus } from '../types';
@@ -17,6 +18,7 @@ interface AuditDetailsProps {
     onAttachFile: (findingId: string, file: File) => void;
     onDeleteAttachment: (findingId: string, attachmentId: string) => void;
     onUpdateActionPlanStatus: (planId: string, newStatus: TaskStatus) => void;
+    onAddFollowUp: (planId: string, content: string) => void;
     onGetAIAssistance: (findingDescription: string) => void;
     aiRecommendation: string;
     isGeneratingAIRecommendation: boolean;
@@ -40,7 +42,7 @@ const statusClasses: Record<AuditStatus, string> = {
 };
 
 export const AuditDetails: React.FC<AuditDetailsProps> = (props) => {
-    const { audit, grid, auditor, users, actionPlans, onUpdateFindingStatus, onUpdateFindingDescription, onAttachFile, onDeleteAttachment, onGetAIAssistance, aiRecommendation, isGeneratingAIRecommendation, onCreateActionPlan, onEditActionPlan, onUpdateActionPlanStatus, onUpdateAuditStatus, currentUser } = props;
+    const { audit, grid, auditor, users, actionPlans, onUpdateFindingStatus, onUpdateFindingDescription, onAttachFile, onDeleteAttachment, onGetAIAssistance, aiRecommendation, isGeneratingAIRecommendation, onCreateActionPlan, onEditActionPlan, onUpdateActionPlanStatus, onAddFollowUp, onUpdateAuditStatus, currentUser } = props;
     
     const [activeTab, setActiveTab] = useState<'findings' | 'plans'>('findings');
     const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
@@ -151,7 +153,7 @@ export const AuditDetails: React.FC<AuditDetailsProps> = (props) => {
                             })}
                         </div>
                     )}
-                    {activeTab === 'plans' && <ActionPlanKanban actionPlans={actionPlans} users={users} findings={audit.findings} onUpdateActionPlanStatus={onUpdateActionPlanStatus} onEditActionPlan={onEditActionPlan} isReadOnly={isReadOnly} />}
+                    {activeTab === 'plans' && <ActionPlanKanban actionPlans={actionPlans} users={users} findings={audit.findings} onUpdateActionPlanStatus={onUpdateActionPlanStatus} onAddFollowUp={onAddFollowUp} onEditActionPlan={onEditActionPlan} isReadOnly={isReadOnly} currentUser={currentUser} />}
                 </div>
             </div>
 

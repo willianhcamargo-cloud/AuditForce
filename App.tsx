@@ -1,7 +1,7 @@
+
 import React, { useState, useCallback } from 'react';
 import { useMockData } from './hooks/useMockData';
-import type { User, Audit, AuditGrid, ActionPlan, Finding, AuditStatus } from './types';
-import { TaskStatus } from './types';
+import type { User, Audit, AuditGrid, ActionPlan, Finding, AuditStatus, Policy, Meeting, PerformanceIndicator, TaskStatus } from './types';
 
 import { LoginScreen } from './components/LoginScreen';
 import { Header } from './components/Header';
@@ -14,13 +14,21 @@ import { CreateUserModal } from './components/CreateUserModal';
 import { CreateAuditModal } from './components/CreateAuditModal';
 import { CreateGridModal } from './components/CreateGridModal';
 import { generateRecommendation } from './services/geminiService';
+import { generateICSFile } from './services/calendarService';
 import { CreateActionPlanModal } from './components/CreateActionPlanModal';
 import { Sidebar } from './components/Sidebar';
 import { Chatbot } from './components/Chatbot';
 import { ReportModal } from './components/ReportModal';
 import { Toast } from './components/Toast';
+import { PolicyManagement } from './components/PolicyManagement';
+import { CreatePolicyModal } from './components/CreatePolicyModal';
+import { ViewPolicyModal } from './components/ViewPolicyModal';
+import { ConfirmationModal } from './components/ConfirmationModal';
+import { CreateMeetingModal } from './components/CreateMeetingModal';
+import { MeetingConfirmationModal } from './components/MeetingConfirmationModal';
 
-type Page = 'dashboard' | 'audits' | 'grids' | 'users' | 'chatbot';
+
+type Page = 'dashboard' | 'audits' | 'grids' | 'users' | 'chatbot' | 'policies';
 
 interface ToastMessage {
     id: number;
@@ -46,6 +54,16 @@ const App: React.FC = () => {
     const [isCreateActionPlanModalOpen, setCreateActionPlanModalOpen] = useState(false);
     const [actionPlanToEdit, setActionPlanToEdit] = useState<ActionPlan | null>(null);
     const [currentFindingIdForActionPlan, setCurrentFindingIdForActionPlan] = useState<string | null>(null);
+    const [currentIndicatorIdForActionPlan, setCurrentIndicatorIdForActionPlan] = useState<string | null>(null);
+    const [isCreatePolicyModalOpen, setCreatePolicyModalOpen] = useState(false);
+    const [policyToEdit, setPolicyToEdit] = useState<Policy | null>(null);
+    const [policyToView, setPolicyToView] = useState<Policy | null>(null);
+    const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null);
+    const [isCreateMeetingModalOpen, setCreateMeetingModalOpen] = useState(false);
+    const [meetingToEdit, setMeetingToEdit] = useState<Meeting | null>(null);
+    const [defaultMeetingDate, setDefaultMeetingDate] = useState<string | null>(null);
+    const [invitationDetails, setInvitationDetails] = useState<{ content: string; filename: string; mailtoUrl: string } | null>(null);
+    const [meetingToCancel, setMeetingToCancel] = useState<Meeting | null>(null);
     const [reportData, setReportData] = useState<{
         audit: Audit;
         grid: AuditGrid;
@@ -213,6 +231,14 @@ const App: React.FC = () => {
 
     const handleOpenCreateActionPlan = (findingId: string) => {
         setCurrentFindingIdForActionPlan(findingId);
+        setCurrentIndicatorIdForActionPlan(null); // Ensure only one is active
+        setActionPlanToEdit(null);
+        setCreateActionPlanModalOpen(true);
+    };
+
+    const handleOpenCreatePolicyActionPlan = (indicatorId: string) => {
+        setCurrentIndicatorIdForActionPlan(indicatorId);
+        setCurrentFindingIdForActionPlan(null); // Ensure only one is active
         setActionPlanToEdit(null);
         setCreateActionPlanModalOpen(true);
     };
@@ -220,10 +246,11 @@ const App: React.FC = () => {
     const handleEditActionPlan = (plan: ActionPlan) => {
         setActionPlanToEdit(plan);
         setCurrentFindingIdForActionPlan(null);
+        setCurrentIndicatorIdForActionPlan(null);
         setCreateActionPlanModalOpen(true);
     };
     
-    const handleSaveActionPlan = (planData: Omit<ActionPlan, 'id'> | ActionPlan) => {
+    const handleSaveActionPlan = (planData: Omit<ActionPlan, 'id' | 'followUps'> | ActionPlan) => {
         mockData.saveActionPlan(planData);
         const responsibleUser = mockData.users.find(u => u.id === planData.who);
         const message = 'id' in planData
@@ -233,10 +260,18 @@ const App: React.FC = () => {
         setCreateActionPlanModalOpen(false);
         setActionPlanToEdit(null);
         setCurrentFindingIdForActionPlan(null);
+        setCurrentIndicatorIdForActionPlan(null);
     };
 
     const handleUpdateActionPlanStatus = (planId: string, newStatus: TaskStatus) => {
         mockData.updateActionPlanStatus(planId, newStatus);
+        addToast('Status do plano de ação atualizado.');
+    };
+
+    const handleAddFollowUp = (planId: string, content: string) => {
+        if (!currentUser) return;
+        mockData.addFollowUpToActionPlan(planId, content, currentUser.id);
+        addToast('Follow-up adicionado com sucesso.');
     };
 
     const handleDeleteAttachment = (findingId: string, attachmentId: string) => {
@@ -260,6 +295,92 @@ const App: React.FC = () => {
             actionPlans,
             users: mockData.users,
         });
+    };
+
+    const handleSavePolicy = (policyData: Omit<Policy, 'id' | 'version' | 'createdAt' | 'updatedAt'> | Policy) => {
+        mockData.savePolicy(policyData);
+        setCreatePolicyModalOpen(false);
+        setPolicyToEdit(null);
+        addToast(`Política "${policyData.title}" salva com sucesso.`);
+    };
+
+    const handleConfirmDeletePolicy = () => {
+        if (policyToDelete) {
+            mockData.deletePolicy(policyToDelete.id);
+            addToast(`Política "${policyToDelete.title}" excluída com sucesso.`, 'success');
+            setPolicyToDelete(null);
+        }
+    };
+
+    const handleOpenEditPolicy = (policy: Policy) => {
+        setPolicyToEdit(policy);
+        setCreatePolicyModalOpen(true);
+    };
+
+    const handleSaveMeeting = (meetingData: Omit<Meeting, 'id' | 'organizerId'> | Meeting) => {
+        let meetingToSave: Omit<Meeting, 'id'> | Meeting;
+
+        if ('id' in meetingData) { // Editing
+            meetingToSave = meetingData;
+        } else { // Creating
+            meetingToSave = {
+                ...meetingData,
+                organizerId: currentUser!.id
+            };
+        }
+        
+        const savedMeeting = mockData.saveMeeting(meetingToSave);
+
+        const policy = mockData.policies.find(p => p.id === savedMeeting.policyId);
+        const attendees = mockData.users.filter(u => savedMeeting.attendeeIds.includes(u.id));
+
+        if (currentUser) {
+            const { content, filename } = generateICSFile(savedMeeting, policy, attendees, currentUser);
+            const message = 'id' in meetingData ? 'Reunião atualizada com sucesso!' : 'Reunião agendada com sucesso!';
+            addToast(message);
+
+            const recipientEmails = attendees.map(u => u.email).join(',');
+            const subject = encodeURIComponent(`Convite: ${savedMeeting.title}`);
+            const body = encodeURIComponent(
+`Olá,
+
+Você foi convidado(a) para a reunião "${savedMeeting.title}".
+
+Data: ${new Date(savedMeeting.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+Horário: ${savedMeeting.startTime} - ${savedMeeting.endTime}
+
+Para adicionar este evento à sua agenda, por favor, anexe o arquivo .ics que será baixado ao enviar este e-mail.
+
+Atenciosamente,
+${currentUser.name}`
+            );
+            const mailtoUrl = `mailto:${recipientEmails}?subject=${subject}&body=${body}`;
+
+            setInvitationDetails({ content, filename, mailtoUrl });
+        }
+        
+        setCreateMeetingModalOpen(false);
+        setMeetingToEdit(null);
+    };
+
+    const handleConfirmCancelMeeting = () => {
+        if (meetingToCancel) {
+            mockData.deleteMeeting(meetingToCancel.id);
+            addToast(`Reunião "${meetingToCancel.title}" cancelada e participantes notificados.`);
+            setMeetingToCancel(null);
+        }
+    };
+
+    const handleOpenCreateMeeting = (date?: string) => {
+        setMeetingToEdit(null);
+        setDefaultMeetingDate(date || null);
+        setCreateMeetingModalOpen(true);
+    };
+
+    const handleOpenEditMeeting = (meeting: Meeting) => {
+        setMeetingToEdit(meeting);
+        setDefaultMeetingDate(null);
+        setCreateMeetingModalOpen(true);
     };
     
     const renderContent = () => {
@@ -291,6 +412,7 @@ const App: React.FC = () => {
                     onCreateActionPlan={handleOpenCreateActionPlan}
                     onEditActionPlan={handleEditActionPlan}
                     onUpdateAuditStatus={mockData.updateAuditStatus}
+                    onAddFollowUp={handleAddFollowUp}
                     currentUser={currentUser!}
                 />
             );
@@ -305,6 +427,8 @@ const App: React.FC = () => {
                 return <GridManagement grids={mockData.grids} onCreateGrid={() => { setGridToEdit(null); setCreateGridModalOpen(true); }} onEditGrid={handleEditGrid} onDeleteGrid={mockData.deleteGrid} currentUser={currentUser!} />;
             case 'users':
                 return <UserManagement users={mockData.users} onCreateUser={handleOpenCreateUserModal} onEditUser={handleOpenEditUserModal} currentUser={currentUser!} />;
+            case 'policies':
+                return <PolicyManagement policies={mockData.policies} currentUser={currentUser!} onEditPolicy={handleOpenEditPolicy} onDeletePolicy={setPolicyToDelete} onOpenViewPolicy={setPolicyToView} onCreatePolicy={() => { setPolicyToEdit(null); setCreatePolicyModalOpen(true); }} users={mockData.users} meetings={mockData.meetings} onOpenCreateMeeting={handleOpenCreateMeeting} onCancelMeeting={setMeetingToCancel} onEditMeeting={handleOpenEditMeeting} onAddFollowUp={handleAddFollowUp} />;
             case 'chatbot': {
                 const userAudits = mockData.audits.filter(
                     (audit) => audit.auditorId === currentUser.id || currentUser.role === 'Administrator'
@@ -313,7 +437,7 @@ const App: React.FC = () => {
                     userAudits.flatMap((audit) => audit.findings.map((finding) => finding.id))
                 );
                 const userActionPlans = mockData.actionPlans.filter((plan) =>
-                    userFindingIds.has(plan.findingId)
+                    plan.findingId && userFindingIds.has(plan.findingId)
                 );
                 return (
                     <Chatbot
@@ -342,6 +466,9 @@ const App: React.FC = () => {
                     onLogout={handleLogout}
                     onBack={selectedAuditId ? handleBackToAudits : undefined}
                     onUpdateAvatar={handleUpdateCurrentUserAvatar}
+                    notifications={mockData.notifications.filter(n => n.userId === currentUser.id)}
+                    onMarkNotificationRead={mockData.markNotificationRead}
+                    onMarkAllNotificationsRead={() => mockData.markAllNotificationsRead(currentUser.id)}
                 />
                 <main className="flex-1 overflow-y-auto">
                     <div className="container mx-auto p-4 md:p-6 h-full">
@@ -371,18 +498,70 @@ const App: React.FC = () => {
                 onSave={handleSaveGrid}
                 gridToEdit={gridToEdit}
             />
+             <CreatePolicyModal
+                isOpen={isCreatePolicyModalOpen}
+                onClose={() => { setCreatePolicyModalOpen(false); setPolicyToEdit(null); }}
+                onSave={handleSavePolicy}
+                policyToEdit={policyToEdit}
+                users={mockData.users}
+            />
+            <ViewPolicyModal
+                isOpen={!!policyToView}
+                onClose={() => setPolicyToView(null)}
+                policy={policyToView}
+                users={mockData.users}
+                actionPlans={mockData.actionPlans}
+                onCreateActionPlan={handleOpenCreatePolicyActionPlan}
+                onEditActionPlan={handleEditActionPlan}
+                onAddFollowUp={handleAddFollowUp}
+                onUpdateActionPlanStatus={handleUpdateActionPlanStatus}
+                currentUser={currentUser}
+            />
             <CreateActionPlanModal
                 isOpen={isCreateActionPlanModalOpen}
                 onClose={() => { setCreateActionPlanModalOpen(false); setActionPlanToEdit(null); }}
                 onSave={handleSaveActionPlan}
                 users={mockData.users}
                 findingId={currentFindingIdForActionPlan}
+                performanceIndicatorId={currentIndicatorIdForActionPlan}
                 planToEdit={actionPlanToEdit}
+            />
+            <CreateMeetingModal
+                isOpen={isCreateMeetingModalOpen}
+                onClose={() => {
+                    setCreateMeetingModalOpen(false);
+                    setDefaultMeetingDate(null);
+                    setMeetingToEdit(null);
+                }}
+                onSave={handleSaveMeeting}
+                policies={mockData.policies}
+                users={mockData.users}
+                defaultDate={defaultMeetingDate}
+                meetingToEdit={meetingToEdit}
+            />
+            <MeetingConfirmationModal
+                isOpen={!!invitationDetails}
+                onClose={() => setInvitationDetails(null)}
+                invitationDetails={invitationDetails}
             />
             <ReportModal 
                 isOpen={!!reportData}
                 onClose={() => setReportData(null)}
                 data={reportData}
+            />
+            <ConfirmationModal
+                isOpen={!!policyToDelete}
+                onClose={() => setPolicyToDelete(null)}
+                onConfirm={handleConfirmDeletePolicy}
+                title="Confirmar Exclusão de Política"
+                message={`Tem certeza de que deseja excluir a política "${policyToDelete?.title}"? Esta ação não pode ser desfeita.`}
+            />
+             <ConfirmationModal
+                isOpen={!!meetingToCancel}
+                onClose={() => setMeetingToCancel(null)}
+                onConfirm={handleConfirmCancelMeeting}
+                title="Confirmar Cancelamento"
+                message={`Tem certeza de que deseja cancelar a reunião "${meetingToCancel?.title}"? Todos os participantes serão notificados.`}
             />
              {/* Toast Container */}
             <div className="fixed bottom-4 right-4 z-[100] w-full max-w-sm space-y-3">

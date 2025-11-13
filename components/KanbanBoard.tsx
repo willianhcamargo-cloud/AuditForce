@@ -34,7 +34,8 @@ interface KanbanBoardProps {
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks }) => {
     const columns = {
-        [TaskStatus.ToDo]: tasks.filter(t => t.status === TaskStatus.ToDo),
+        // FIX: Replaced TaskStatus.ToDo with TaskStatus.Pending as 'ToDo' does not exist in the enum.
+        [TaskStatus.Pending]: tasks.filter(t => t.status === TaskStatus.Pending),
         [TaskStatus.InProgress]: tasks.filter(t => t.status === TaskStatus.InProgress),
         [TaskStatus.Done]: tasks.filter(t => t.status === TaskStatus.Done),
     };
