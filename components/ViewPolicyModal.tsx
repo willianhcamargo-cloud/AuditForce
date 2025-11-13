@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Policy, PolicyStatus, User, ActionPlan, TaskStatus } from '../types';
 import { MarkdownViewer } from './MarkdownViewer';
 import { UserAvatar } from './UserAvatar';
@@ -10,6 +10,7 @@ interface ViewPolicyModalProps {
     isOpen: boolean;
     onClose: () => void;
     policy: Policy | null;
+    policyHistory: Policy[];
     users: User[];
     actionPlans: ActionPlan[];
     onCreateActionPlan: (indicatorId: string) => void;
@@ -32,13 +33,16 @@ const getComplianceColor = (percentage: number) => {
 };
 
 
-export const ViewPolicyModal: React.FC<ViewPolicyModalProps> = ({ isOpen, onClose, policy, users, actionPlans, onCreateActionPlan, onEditActionPlan, onAddFollowUp, onUpdateActionPlanStatus, currentUser }) => {
+export const ViewPolicyModal: React.FC<ViewPolicyModalProps> = ({ isOpen, onClose, policy, policyHistory, users, actionPlans, onCreateActionPlan, onEditActionPlan, onAddFollowUp, onUpdateActionPlanStatus, currentUser }) => {
     const [planToView, setPlanToView] = useState<ActionPlan | null>(null);
+    const [viewedPolicy, setViewedPolicy] = useState<Policy | null>(policy);
 
-    // FIX: Add useEffect to listen for changes in the main actionPlans prop.
-    // This ensures that when a status is updated or a follow-up is added,
-    // the currently viewed plan details are refreshed in real-time without
-    // needing to close and re-open the modal.
+    useEffect(() => {
+        if (isOpen) {
+            setViewedPolicy(policy);
+        }
+    }, [policy, isOpen]);
+
     useEffect(() => {
         if (planToView) {
             const updatedPlan = actionPlans.find(p => p.id === planToView.id);
@@ -50,10 +54,27 @@ export const ViewPolicyModal: React.FC<ViewPolicyModalProps> = ({ isOpen, onClos
             }
         }
     }, [actionPlans, planToView]);
-
-
-    if (!isOpen || !policy) return null;
     
+    const historicalVersions = useMemo(() => {
+        if (!policy) return [];
+        return policyHistory
+            .filter(p => p.id === policy.id)
+            .sort((a, b) => parseFloat(b.version) - parseFloat(a.version));
+    }, [policyHistory, policy]);
+
+    if (!isOpen || !policy || !viewedPolicy) return null;
+
+    const isViewingHistory = viewedPolicy.version !== policy.version;
+    const allVersions = [policy, ...historicalVersions];
+    
+    const handleVersionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const selectedVersion = e.target.value;
+        const policyToView = allVersions.find(p => p.version === selectedVersion);
+        if (policyToView) {
+            setViewedPolicy(policyToView);
+        }
+    };
+
     const isPlanReadOnly = (plan: ActionPlan) => {
        if (!currentUser) return true;
        return currentUser.role !== 'Administrator' && plan.who !== currentUser.id;
@@ -65,11 +86,11 @@ export const ViewPolicyModal: React.FC<ViewPolicyModalProps> = ({ isOpen, onClos
                 <div className="bg-white text-gray-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                     <header className="flex justify-between items-center p-4 border-b">
                         <div>
-                            <h2 className="text-xl font-bold">{policy.title}</h2>
+                            <h2 className="text-xl font-bold">{viewedPolicy.title}</h2>
                             <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                                <span>{policy.category}</span>
-                                <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">v{policy.version}</span>
-                                 <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusClasses[policy.status]}`}>{policy.status}</span>
+                                <span>{viewedPolicy.category}</span>
+                                <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">v{viewedPolicy.version}</span>
+                                 <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusClasses[viewedPolicy.status]}`}>{viewedPolicy.status}</span>
                             </div>
                         </div>
                          <button onClick={onClose} aria-label="Close modal" className="text-gray-500 hover:text-gray-800">
@@ -78,12 +99,35 @@ export const ViewPolicyModal: React.FC<ViewPolicyModalProps> = ({ isOpen, onClos
                     </header>
                     
                     <div className="p-6 overflow-y-auto" id="policy-content-area">
+                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                            <div className="flex items-center gap-2">
+                                <label htmlFor="version-selector" className="text-sm font-medium text-gray-700">Versão:</label>
+                                <select 
+                                    id="version-selector"
+                                    value={viewedPolicy.version}
+                                    onChange={handleVersionChange}
+                                    className="block w-full sm:w-auto pl-3 pr-10 py-1 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
+                                >
+                                    {allVersions.map(p => (
+                                        <option key={p.version} value={p.version}>
+                                            v{p.version} ({new Date(p.updatedAt).toLocaleDateString('pt-BR')}) {p.version === policy.version ? ' - Atual' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            {isViewingHistory && (
+                                <div className="p-2 bg-yellow-100 text-yellow-800 rounded-md text-xs text-center border border-yellow-200">
+                                    <p>Você está visualizando uma versão anterior. Apenas para consulta.</p>
+                                </div>
+                            )}
+                        </div>
+
                         <div id="policy-print-content">
                             <h3 className="text-lg font-bold my-4 pt-4 border-t text-gray-800">Conteúdo da Política</h3>
-                            <MarkdownViewer content={policy.content} />
+                            <MarkdownViewer content={viewedPolicy.content} />
 
                             <h3 className="text-lg font-bold my-4 pt-4 border-t text-gray-800">Objetivos e Metas</h3>
-                            {policy.performanceIndicators.length > 0 ? (
+                            {viewedPolicy.performanceIndicators.length > 0 ? (
                                  <div className="overflow-x-auto">
                                     <table className="min-w-full divide-y divide-gray-200">
                                         <thead className="bg-gray-50">
@@ -97,7 +141,7 @@ export const ViewPolicyModal: React.FC<ViewPolicyModalProps> = ({ isOpen, onClos
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-gray-200">
-                                            {policy.performanceIndicators.map(indicator => {
+                                            {viewedPolicy.performanceIndicators.map(indicator => {
                                                 const responsibleUser = users.find(u => u.id === indicator.responsibleId);
                                                 const compliance = indicator.goal > 0 ? (indicator.actualValue / indicator.goal) * 100 : 0;
                                                 const isGoalMet = indicator.actualValue >= indicator.goal;
@@ -133,7 +177,8 @@ export const ViewPolicyModal: React.FC<ViewPolicyModalProps> = ({ isOpen, onClos
                                                             ) : (
                                                                 <button
                                                                     onClick={() => onCreateActionPlan(indicator.id)}
-                                                                    className="text-blue-600 hover:text-blue-800 font-semibold text-xs"
+                                                                    className="text-blue-600 hover:text-blue-800 font-semibold text-xs disabled:text-gray-400 disabled:cursor-not-allowed disabled:no-underline"
+                                                                    disabled={isViewingHistory}
                                                                 >
                                                                     Criar Plano de Ação
                                                                 </button>
@@ -156,7 +201,7 @@ export const ViewPolicyModal: React.FC<ViewPolicyModalProps> = ({ isOpen, onClos
                 <ActionPlanDetailsModal 
                     plan={planToView}
                     user={users.find(u => u.id === planToView.who)}
-                    performanceIndicator={policy.performanceIndicators.find(i => i.id === planToView.performanceIndicatorId)}
+                    performanceIndicator={viewedPolicy.performanceIndicators.find(i => i.id === planToView.performanceIndicatorId)}
                     users={users}
                     onClose={() => setPlanToView(null)}
                     onEdit={(plan) => {

@@ -182,6 +182,7 @@ export const useMockData = () => {
     const [audits, setAudits] = useState<Audit[]>(initialAudits);
     const [actionPlans, setActionPlans] = useState<ActionPlan[]>(initialActionPlans);
     const [policies, setPolicies] = useState<Policy[]>(initialPolicies);
+    const [policyHistory, setPolicyHistory] = useState<Policy[]>([]);
     const [meetings, setMeetings] = useState<Meeting[]>(initialMeetings);
     const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
 
@@ -429,7 +430,7 @@ export const useMockData = () => {
             
             let shouldBumpVersion = false;
 
-            // 1. Check for changes in main fields
+            // 1. Check for changes in main fields (title, category, content)
             if (
                 policyData.title !== existingPolicy.title ||
                 policyData.category !== existingPolicy.category ||
@@ -438,25 +439,33 @@ export const useMockData = () => {
                 shouldBumpVersion = true;
             }
 
-            // 2. Check for changes in performance indicators (anything except actualValue)
+            // 2. Check for changes in performance indicators if version hasn't been bumped yet
             if (!shouldBumpVersion) {
                 const newIndicators = policyData.performanceIndicators;
                 const oldIndicators = existingPolicy.performanceIndicators;
 
+                // Bump version if the number of indicators changes
                 if (newIndicators.length !== oldIndicators.length) {
                     shouldBumpVersion = true;
                 } else {
+                    // If lengths are the same, check for modifications in existing indicators
+// FIX: Explicitly type the Map to ensure `get` returns a correctly typed object, resolving the 'unknown' type error.
                     const oldIndicatorsMap = new Map<string, PerformanceIndicator>(oldIndicators.map(i => [i.id, i]));
+                    
                     for (const newIndicator of newIndicators) {
                         const oldIndicator = oldIndicatorsMap.get(newIndicator.id);
-                        if (!oldIndicator || // A new indicator was added, and an old one was removed
+                        
+                        // If an indicator was replaced (new ID) or modified, bump version.
+                        // We compare every field EXCEPT 'actualValue'.
+                        if (
+                            !oldIndicator ||
                             newIndicator.objective !== oldIndicator.objective ||
                             newIndicator.department !== oldIndicator.department ||
                             newIndicator.responsibleId !== oldIndicator.responsibleId ||
                             newIndicator.goal !== oldIndicator.goal
                         ) {
                             shouldBumpVersion = true;
-                            break;
+                            break; // A change was found, no need to check further
                         }
                     }
                 }
@@ -464,6 +473,10 @@ export const useMockData = () => {
 
             let newVersion = existingPolicy.version;
             if (shouldBumpVersion) {
+                // Save the old version to history before updating
+                setPolicyHistory(current => [...current, existingPolicy]);
+
+                // Increment the minor version number (e.g., 1.0 -> 1.1)
                 const versionParts = existingPolicy.version.split('.').map(Number);
                 versionParts[1] = (versionParts[1] || 0) + 1;
                 newVersion = versionParts.join('.');
@@ -478,7 +491,7 @@ export const useMockData = () => {
             setPolicies(current => current.map(p => (p.id === updatedPolicy.id ? updatedPolicy : p)));
 
         } else {
-            // Creating new policy
+            // Creating a new policy
             const newPolicy: Policy = {
                 id: generateId(),
                 version: '1.0',
@@ -492,6 +505,7 @@ export const useMockData = () => {
 
     const deletePolicy = useCallback((policyId: string) => {
         setPolicies(current => current.filter(p => p.id !== policyId));
+        setPolicyHistory(current => current.filter(p => p.id !== policyId));
     }, []);
 
     const saveMeeting = useCallback((meetingData: Omit<Meeting, 'id'> | Meeting): Meeting => {
@@ -569,6 +583,7 @@ export const useMockData = () => {
         audits,
         actionPlans,
         policies,
+        policyHistory,
         meetings,
         notifications,
         addUser,

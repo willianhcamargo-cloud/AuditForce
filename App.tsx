@@ -509,6 +509,7 @@ ${currentUser.name}`
                 isOpen={!!policyToView}
                 onClose={() => setPolicyToView(null)}
                 policy={policyToView}
+                policyHistory={mockData.policyHistory}
                 users={mockData.users}
                 actionPlans={mockData.actionPlans}
                 onCreateActionPlan={handleOpenCreatePolicyActionPlan}
