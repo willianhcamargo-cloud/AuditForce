@@ -1,13 +1,29 @@
+
 import { GoogleGenAI } from "@google/genai";
 import type { Audit, AuditGrid, ActionPlan } from '../types';
 
-// Per guidelines, API_KEY is assumed to be pre-configured and valid.
-// The SDK will handle the key, so no need for additional variables or checks.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy initialization to prevent top-level crashes if env vars aren't ready or process is undefined.
+let ai: GoogleGenAI | null = null;
+
+const getAiClient = () => {
+    if (!ai) {
+        // Per guidelines, API_KEY is assumed to be pre-configured and valid.
+        // We add a safety check for 'process' to prevent ReferenceError in pure browser environments.
+        const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : '';
+        
+        if (!apiKey) {
+            console.warn("API Key not found. AI features will not work.");
+        }
+        
+        ai = new GoogleGenAI({ apiKey: apiKey || '' });
+    }
+    return ai;
+}
 
 export const generateRecommendation = async (findingDescription: string): Promise<string> => {
     try {
-        const response = await ai.models.generateContent({
+        const client = getAiClient();
+        const response = await client.models.generateContent({
             model: "gemini-2.5-flash",
             contents: `Com base na seguinte constatação de auditoria, sugira um plano de ação e recomendação claros e concisos. A resposta deve ser em português do Brasil.\n\nConstatação: "${findingDescription}"`,
             config: {
@@ -18,7 +34,7 @@ export const generateRecommendation = async (findingDescription: string): Promis
         });
 
         // FIX: Directly return the 'text' property from the response object as per guidelines.
-        return response.text;
+        return response.text || '';
     } catch (error) {
         console.error("Error generating recommendation:", error);
         throw new Error("Failed to communicate with the AI model.");
@@ -74,8 +90,9 @@ ${contextString}
 `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro",
+        const client = getAiClient();
+        const response = await client.models.generateContent({
+            model: "gemini-2.5-pro-preview-02-05",
             contents: `A pergunta do usuário é: "${prompt}"`,
             config: {
                 systemInstruction: systemInstruction,
@@ -83,7 +100,7 @@ ${contextString}
             },
         });
 
-        return response.text;
+        return response.text || '';
     } catch (error) {
         console.error("Error generating chatbot response:", error);
         throw new Error("Failed to communicate with the AI model for chatbot.");

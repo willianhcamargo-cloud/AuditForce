@@ -10,7 +10,10 @@ interface ActionPlanManagementProps {
 export const ActionPlanManagement: React.FC<ActionPlanManagementProps> = ({ actionPlans, users, findings }) => {
     
     const findUserName = (id: string) => users.find(u => u.id === id)?.name || 'N/A';
-    const findFindingTitle = (id: string) => findings.find(f => f.id === id)?.title || 'N/A';
+    const findFindingTitle = (id: string | undefined) => {
+        if (!id) return 'N/A';
+        return findings.find(f => f.id === id)?.title || 'N/A';
+    };
 
     return (
         <div className="bg-surface rounded-lg shadow-md p-6">

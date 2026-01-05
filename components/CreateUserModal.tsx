@@ -1,6 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import type { User } from '../types';
-import type { UserSubmitData } from '../App';
+import type { User, UserSubmitData } from '../types';
 
 interface CreateUserModalProps {
     isOpen: boolean;

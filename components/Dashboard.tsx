@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import type { Audit, ActionPlan, User, AuditStatus } from '../types';
 import { TaskStatus, FindingStatus } from '../types';
@@ -62,8 +63,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ audits, actionPlans, curre
         const visibleFindingIds = new Set(
             visibleAudits.flatMap(audit => audit.findings.map(finding => finding.id))
         );
-
-        const visibleActionPlans = actionPlans.filter(plan => visibleFindingIds.has(plan.findingId));
+        
+        // FIX: Added a check for 'plan.findingId' to prevent calling '.has()' with undefined,
+        // which could cause a runtime error and prevent the dashboard from loading.
+        const visibleActionPlans = actionPlans.filter(plan => plan.findingId && visibleFindingIds.has(plan.findingId));
 
         return { visibleAudits, visibleActionPlans };
     }, [audits, actionPlans, currentUser]);

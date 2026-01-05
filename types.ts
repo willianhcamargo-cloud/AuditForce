@@ -149,3 +149,6 @@ export interface Notification {
     timestamp: string; // ISO date string
     read: boolean;
 }
+
+export type UserSubmitData = (Omit<User, 'id' | 'avatarUrl' | 'status'> | Omit<User, 'avatarUrl' | 'status'>) & { avatarFile?: File | null };
+export type PolicySubmitData = Omit<Policy, 'id' | 'version' | 'createdAt' | 'updatedAt' | 'changeHistory'> | Policy;

@@ -1,7 +1,7 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+// FIX: Changed to a named import to match the export style in App.tsx.
+import { App } from './App';
 import { ThemeProvider } from './contexts/ThemeContext';
 
 const rootElement = document.getElementById('root');

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { ActionPlan, User, Finding, PerformanceIndicator } from '../types';
 import { TaskStatus } from '../types';

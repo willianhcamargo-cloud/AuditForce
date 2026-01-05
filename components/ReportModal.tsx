@@ -4,7 +4,7 @@ import type { Audit, AuditGrid, User, ActionPlan } from '../types';
 import { FindingStatus, TaskStatus } from '../types';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { UserAvatar } from './UserAvatar';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
 interface ReportModalProps {

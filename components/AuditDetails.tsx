@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import type { Audit, AuditGrid, User, Finding, ActionPlan, AuditStatus, Attachment } from '../types';
 import { FindingStatus, TaskStatus } from '../types';
@@ -56,6 +57,8 @@ export const AuditDetails: React.FC<AuditDetailsProps> = (props) => {
     };
     
     const selectedFinding = selectedFindingId ? audit.findings.find(f => f.id === selectedFindingId) : null;
+    const requirementForModal = selectedFinding ? grid.requirements.find(r => r.id === selectedFinding.requirementId) : null;
+
 
     return (
         <div className="space-y-6">
@@ -157,12 +160,12 @@ export const AuditDetails: React.FC<AuditDetailsProps> = (props) => {
                 </div>
             </div>
 
-            {selectedFinding && (
+            {selectedFinding && requirementForModal && (
                 <FindingDetailsModal
                     isOpen={!!selectedFinding}
                     onClose={() => setSelectedFindingId(null)}
                     finding={selectedFinding}
-                    requirement={grid.requirements.find(r => r.id === selectedFinding.requirementId)!}
+                    requirement={requirementForModal}
                     onUpdateFindingStatus={onUpdateFindingStatus}
                     onUpdateFindingDescription={onUpdateFindingDescription}
                     onAttachFile={onAttachFile}
