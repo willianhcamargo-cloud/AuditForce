@@ -27,6 +27,7 @@ import { ConfirmationModal } from './components/ConfirmationModal';
 import { CreateMeetingModal } from './components/CreateMeetingModal';
 import { MeetingConfirmationModal } from './components/MeetingConfirmationModal';
 import { VersionConfirmationModal } from './components/VersionConfirmationModal';
+import { InviteCompleteScreen } from './components/InviteCompleteScreen';
 
 
 type Page = 'dashboard' | 'audits' | 'grids' | 'users' | 'chatbot' | 'policies';
@@ -52,6 +53,61 @@ export const App: React.FC = () => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [currentPage, setCurrentPage] = useState<Page>('dashboard');
     const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
+
+    const [inviteToken, setInviteToken] = useState<string | null>(null);
+    const [inviteUser, setInviteUser] = useState<User | null>(null);
+
+    const dispatchServerEmail = async (to: string, subject: string, htmlContent: string) => {
+        try {
+            const response = await fetch('/api/send-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ to, subject, htmlContent })
+            });
+            const data = await response.json();
+            if (data.success) {
+                if (data.testUrl) {
+                    console.log(`[E-mail de Teste] Visualizar em: ${data.testUrl}`);
+                    addToast(`E-mail real enviado! (Modo sandbox, visualize na console do navegador)`, 'success');
+                } else {
+                    addToast(`E-mail enviado com sucesso para ${to}!`, 'success');
+                }
+                return true;
+            } else {
+                throw new Error(data.error || 'Erro no envio do e-mail.');
+            }
+        } catch (error: any) {
+            console.error('Falha ao enviar e-mail via servidor:', error);
+            addToast(`Falha ao enviar e-mail real: ${error.message || error}`, 'error');
+            return false;
+        }
+    };
+
+
+    React.useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const inviteParam = params.get('invite');
+        if (inviteParam) {
+            setInviteToken(inviteParam);
+            const user = mockData.users.find(u => u.inviteToken === inviteParam && u.isPendingInvite);
+            if (user) {
+                setInviteUser(user);
+            } else {
+                // Check if user has already activated or if token is invalid
+                const alreadyActivated = mockData.users.find(u => u.inviteToken === inviteParam && !u.isPendingInvite);
+                if (alreadyActivated) {
+                    addToast('Este convite já foi aceito e o cadastro concluído.', 'error');
+                } else {
+                    addToast('Convite inválido ou expirado.', 'error');
+                }
+                window.history.replaceState({}, document.title, window.location.pathname);
+                setInviteToken(null);
+                setInviteUser(null);
+            }
+        }
+    }, [mockData.users]);
 
     // Modal States
     const [isCreateUserModalOpen, setCreateUserModalOpen] = useState(false);
@@ -98,15 +154,18 @@ export const App: React.FC = () => {
 
     const handleLogin = (email: string, password?: string): boolean => {
         const lowerCaseEmail = email.toLowerCase();
-        let user: User | undefined;
-
-        if (lowerCaseEmail === 'willianhcamargo@gmail.com') {
-            user = mockData.users.find(u => u.email.toLowerCase() === lowerCaseEmail && u.role === 'Administrator');
-        } else {
-            user = mockData.users.find(u => u.email.toLowerCase() === lowerCaseEmail && u.password === password);
-        }
+        const user = mockData.users.find(u => u.email.toLowerCase() === lowerCaseEmail);
         
         if (user) {
+            // If administrator and password is not set yet, reject normal login.
+            if (user.role === 'Administrator' && !user.password) {
+                return false;
+            }
+            
+            if (user.password !== password) {
+                return false;
+            }
+            
             const userWithOnlineStatus: User = { ...user, status: 'Online' };
             mockData.updateUser(userWithOnlineStatus);
             setCurrentUser(userWithOnlineStatus);
@@ -114,6 +173,17 @@ export const App: React.FC = () => {
         }
 
         return false;
+    };
+
+    const handleSetAdminPassword = (email: string, password: string) => {
+        const lowerCaseEmail = email.toLowerCase();
+        const user = mockData.users.find(u => u.email.toLowerCase() === lowerCaseEmail && u.role === 'Administrator');
+        if (user) {
+            const updatedUser: User = { ...user, password, status: 'Online' };
+            mockData.updateUser(updatedUser);
+            setCurrentUser(updatedUser);
+            addToast('Senha do administrador definida com sucesso! Bem-vindo.');
+        }
     };
 
     const handleLogout = () => {
@@ -171,15 +241,135 @@ export const App: React.FC = () => {
                 return;
             }
             
+            const inviteToken = 'inv-' + Math.random().toString(36).substring(2, 11);
+            
             mockData.addUser({
                 ...restUserData,
                 avatarUrl: avatarUrl,
+                isPendingInvite: true,
+                invitedAt: new Date().toISOString(),
+                inviteToken: inviteToken,
             });
-            addToast(`Usuário ${restUserData.name} criado.`);
+
+            // Build gorgeous invitation HTML email
+            const inviteLink = `${window.location.origin}${window.location.pathname}?invite=${inviteToken}`;
+            const emailSubject = `AuditForce - Aceite o Convite para Cadastro`;
+            const emailBody = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; background-color: #ffffff;">
+                    <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #3b82f6; padding-bottom: 16px;">
+                        <h1 style="color: #3b82f6; margin: 0; font-size: 28px; font-weight: 800; tracking-tight: -0.05em;">AuditForce</h1>
+                        <p style="color: #6b7280; font-size: 14px; margin-top: 4px; font-weight: 500;">Gestão Inteligente de Auditoria</p>
+                    </div>
+                    <p style="font-size: 16px; color: #111827; font-weight: 600;">Olá, <strong>${restUserData.name}</strong>!</p>
+                    <p style="font-size: 14px; color: #374151; line-height: 1.6;">
+                        Você foi cadastrado por um Administrador para integrar a plataforma de auditoria do <strong>AuditForce</strong> com o perfil de <strong>${
+                            restUserData.role === 'Employee' ? 'Funcionário' :
+                            restUserData.role === 'Manager' ? 'Gerente' :
+                            restUserData.role === 'Auditor' ? 'Auditor' : 'Administrador'
+                        }</strong>.
+                    </p>
+                    <p style="font-size: 14px; color: #374151; line-height: 1.6; margin-bottom: 20px;">
+                        Para aceitar este convite, confirmar seu endereço de e-mail e definir sua senha de acesso inicial, clique no botão de ativação abaixo:
+                    </p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${inviteLink}" style="background-color: #2563eb; color: #ffffff; padding: 14px 28px; font-weight: bold; text-decoration: none; border-radius: 6px; display: inline-block; font-size: 15px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                            Aceitar Solicitação e Definir Senha
+                        </a>
+                    </div>
+                    <p style="font-size: 13px; color: #4b5563; line-height: 1.6; margin-top: 24px;">
+                        Se o botão acima não funcionar, copie e cole o seguinte link em seu navegador:
+                    </p>
+                    <p style="font-size: 12px; word-break: break-all; background-color: #f3f4f6; padding: 10px; border-radius: 4px;">
+                        <a href="${inviteLink}" style="color: #2563eb; text-decoration: underline;">${inviteLink}</a>
+                    </p>
+                    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
+                    <p style="font-size: 11px; color: #9ca3af; text-align: center; line-height: 1.4;">
+                        Este é um e-mail automatizado de convite enviado pelo sistema AuditForce.<br/>
+                        Por favor, não responda diretamente a esta mensagem.
+                    </p>
+                </div>
+            `;
+
+            // Save simulated email to mock list
+            const newSimulatedEmail = {
+                id: 'email-' + Math.random().toString(36).substring(2, 11),
+                to: restUserData.email,
+                subject: emailSubject,
+                body: emailBody,
+                sentAt: new Date().toISOString(),
+                inviteToken: inviteToken,
+                name: restUserData.name
+            };
+
+            const existingEmails = JSON.parse(localStorage.getItem('auditforce_sent_emails') || '[]');
+            localStorage.setItem('auditforce_sent_emails', JSON.stringify([newSimulatedEmail, ...existingEmails]));
+
+            // Dispatch instant notification update
+            window.dispatchEvent(new Event('auditforce_emails_updated'));
+
+            // Dispatch automated real server email
+            dispatchServerEmail(restUserData.email, emailSubject, emailBody);
         }
 
         setCreateUserModalOpen(false);
         setUserToEdit(null);
+    };
+
+    const handleCompleteInvite = (password: string) => {
+        if (!inviteUser) return;
+
+        const updatedUser: User = {
+            ...inviteUser,
+            isPendingInvite: false,
+            password: password,
+            status: 'Online',
+        };
+
+        // Save to mockData
+        mockData.updateUser(updatedUser);
+
+        // Notify administrators
+        const administrators = mockData.users.filter(u => u.role === 'Administrator' || u.email.toLowerCase() === 'willianhcamargo@gmail.com');
+        administrators.forEach(admin => {
+            mockData.addNotification(admin.id, `O usuário ${inviteUser.name} finalizou o cadastro e agora está ativo.`);
+
+            const adminSubject = `AuditForce - Cadastro Concluído: ${inviteUser.name}`;
+            const adminBody = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; background-color: #ffffff;">
+                    <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #10b981; padding-bottom: 16px;">
+                        <h1 style="color: #10b981; margin: 0; font-size: 28px; font-weight: 800; tracking-tight: -0.05em;">AuditForce</h1>
+                        <p style="color: #6b7280; font-size: 14px; margin-top: 4px; font-weight: 500;">Cadastro Concluído com Sucesso</p>
+                    </div>
+                    <p style="font-size: 16px; color: #111827; font-weight: 600;">Olá, Administrador!</p>
+                    <p style="font-size: 14px; color: #374151; line-height: 1.6;">
+                        O usuário <strong>${inviteUser.name}</strong> (${inviteUser.email}) aceitou o convite e concluiu com sucesso o seu cadastro no <strong>AuditForce</strong>.
+                    </p>
+                    <p style="font-size: 14px; color: #374151; line-height: 1.6;">
+                        Ele agora possui acesso ativo como <strong>${
+                            inviteUser.role === 'Employee' ? 'Funcionário' :
+                            inviteUser.role === 'Manager' ? 'Gerente' :
+                            inviteUser.role === 'Auditor' ? 'Auditor' : 'Administrador'
+                        }</strong> e já pode acessar a plataforma.
+                    </p>
+                    <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
+                    <p style="font-size: 11px; color: #9ca3af; text-align: center; line-height: 1.4;">
+                        Este é um e-mail automatizado enviado pelo sistema AuditForce.<br/>
+                        Por favor, não responda diretamente a esta mensagem.
+                    </p>
+                </div>
+            `;
+            dispatchServerEmail(admin.email, adminSubject, adminBody);
+        });
+
+        // Set current user (login the user automatically)
+        setCurrentUser(updatedUser);
+
+        // Clean query param
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setInviteToken(null);
+        setInviteUser(null);
+
+        addToast('Cadastro concluído com sucesso! Bem-vindo ao AuditForce.');
     };
     
     const handleOpenEditUserModal = (userId: string) => {
@@ -336,7 +526,20 @@ export const App: React.FC = () => {
     const selectedAudit = selectedAuditId ? mockData.audits.find(a => a.id === selectedAuditId) : null;
     const selectedGrid = selectedAudit ? mockData.grids.find(g => g.id === selectedAudit.gridId) : null;
 
-    if (!currentUser) return <LoginScreen onLogin={handleLogin} />;
+    if (inviteUser) return (
+        <InviteCompleteScreen 
+            user={inviteUser} 
+            onCompleteRegistration={handleCompleteInvite} 
+        />
+    );
+
+    if (!currentUser) return (
+        <LoginScreen 
+            users={mockData.users} 
+            onLogin={handleLogin} 
+            onSetAdminPassword={handleSetAdminPassword} 
+        />
+    );
 
     const renderPage = () => {
         if (selectedAudit && selectedGrid) {
@@ -368,7 +571,14 @@ export const App: React.FC = () => {
             case 'dashboard': return <Dashboard audits={mockData.audits} actionPlans={mockData.actionPlans} currentUser={currentUser} onNavigate={handleNavigate} />;
             case 'audits': return <AuditList audits={mockData.audits} users={mockData.users} onSelectAudit={handleSelectAudit} onCreateAudit={() => setCreateAuditModalOpen(true)} onUpdateAuditStatus={mockData.updateAuditStatus} currentUser={currentUser} onOpenReport={handleOpenReport} />;
             case 'grids': return <GridManagement grids={mockData.grids} onCreateGrid={() => { setGridToEdit(null); setCreateGridModalOpen(true); }} onEditGrid={handleEditGrid} onDeleteGrid={mockData.deleteGrid} currentUser={currentUser} />;
-            case 'users': return <UserManagement users={mockData.users} onCreateUser={handleOpenCreateUserModal} onEditUser={handleOpenEditUserModal} currentUser={currentUser} />;
+            case 'users': return (
+                <UserManagement 
+                    users={mockData.users} 
+                    onCreateUser={handleOpenCreateUserModal} 
+                    onEditUser={handleOpenEditUserModal} 
+                    currentUser={currentUser}
+                />
+            );
             case 'chatbot': return <Chatbot currentUser={currentUser} audits={mockData.audits} grids={mockData.grids} actionPlans={mockData.actionPlans} />;
             case 'policies': return <PolicyManagement policies={mockData.policies} currentUser={currentUser} onCreatePolicy={() => { setPolicyToEdit(null); setCreatePolicyModalOpen(true); }} onEditPolicy={(policy) => { setPolicyToEdit(policy); setCreatePolicyModalOpen(true); }} onDeletePolicy={(policy) => setPolicyToDelete(policy)} onOpenViewPolicy={(policy) => setPolicyToView(policy)} users={mockData.users} meetings={mockData.meetings} onOpenCreateMeeting={(date) => { setMeetingToEdit(null); setDefaultMeetingDate(date || null); setCreateMeetingModalOpen(true); }} onCancelMeeting={(meeting) => setMeetingToCancel(meeting)} onEditMeeting={(meeting) => { setMeetingToEdit(meeting); setCreateMeetingModalOpen(true); }} onAddFollowUp={(planId, content) => mockData.addFollowUpToActionPlan(planId, content, currentUser.id)} />;
             default: return <Dashboard audits={mockData.audits} actionPlans={mockData.actionPlans} currentUser={currentUser} onNavigate={handleNavigate} />;

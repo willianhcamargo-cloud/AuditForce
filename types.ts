@@ -7,6 +7,9 @@ export interface User {
   avatarUrl: string;
   password?: string;
   status: 'Online' | 'Offline';
+  isPendingInvite?: boolean;
+  invitedAt?: string;
+  inviteToken?: string;
 }
 
 export enum TaskStatus {
@@ -45,6 +48,8 @@ export interface ActionPlan {
     howMuch?: number;
     status: TaskStatus;
     followUps: FollowUp[];
+    evidence?: string;
+    evidenceAttachments?: Attachment[];
 }
 
 export type AuditStatus = 'Planejando' | 'Em Execução' | 'Plano de Ação' | 'Concluído';

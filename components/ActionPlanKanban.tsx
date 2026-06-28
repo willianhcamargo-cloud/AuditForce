@@ -1,15 +1,16 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { ActionPlan, User, Finding } from '../types';
+import type { ActionPlan, User, Finding, Attachment } from '../types';
 import { TaskStatus } from '../types';
 import { ActionPlanDetailsModal } from './ActionPlanDetailsModal';
 import { UserAvatar } from './UserAvatar';
+import { ActionPlanEvidenceModal } from './ActionPlanEvidenceModal';
 
 interface ActionPlanKanbanProps {
     actionPlans: ActionPlan[];
     users: User[];
     findings: Finding[];
-    onUpdateActionPlanStatus: (planId: string, newStatus: TaskStatus) => void;
+    onUpdateActionPlanStatus: (planId: string, newStatus: TaskStatus, evidence?: string, evidenceAttachments?: Attachment[]) => void;
     onAddFollowUp: (planId: string, content: string) => void;
     onEditActionPlan: (plan: ActionPlan) => void;
     isReadOnly: boolean;
@@ -98,6 +99,22 @@ const KanbanColumn: React.FC<{
 
 export const ActionPlanKanban: React.FC<ActionPlanKanbanProps> = ({ actionPlans, users, findings, onUpdateActionPlanStatus, onAddFollowUp, onEditActionPlan, isReadOnly, currentUser }) => {
     const [selectedPlanDetails, setSelectedPlanDetails] = useState<ActionPlan | null>(null);
+    const [planForEvidence, setPlanForEvidence] = useState<ActionPlan | null>(null);
+
+    const handleColumnDrop = (planId: string, newStatus: TaskStatus) => {
+        if (newStatus === TaskStatus.Done) {
+            const plan = actionPlans.find(p => p.id === planId);
+            if (plan) {
+                if (plan.evidence && plan.evidenceAttachments && plan.evidenceAttachments.length > 0) {
+                    onUpdateActionPlanStatus(planId, newStatus);
+                } else {
+                    setPlanForEvidence(plan);
+                }
+            }
+        } else {
+            onUpdateActionPlanStatus(planId, newStatus);
+        }
+    };
 
     // FIX: Add useEffect to listen for changes in actionPlans prop.
     // This ensures that when a status is updated or a follow-up is added,
@@ -140,7 +157,7 @@ export const ActionPlanKanban: React.FC<ActionPlanKanbanProps> = ({ actionPlans,
                         plans={columns[status]} 
                         users={users}
                         findings={findings}
-                        onDrop={onUpdateActionPlanStatus}
+                        onDrop={handleColumnDrop}
                         onCardClick={(plan) => setSelectedPlanDetails(plan)}
                         isReadOnly={isReadOnly}
                     />
@@ -172,6 +189,18 @@ export const ActionPlanKanban: React.FC<ActionPlanKanbanProps> = ({ actionPlans,
                     onUpdateStatus={onUpdateActionPlanStatus}
                     isReadOnly={isReadOnly}
                     currentUser={currentUser}
+                />
+            )}
+
+            {planForEvidence && (
+                <ActionPlanEvidenceModal
+                    isOpen={!!planForEvidence}
+                    onClose={() => setPlanForEvidence(null)}
+                    plan={planForEvidence}
+                    onConfirm={(evidenceText, attachments) => {
+                        onUpdateActionPlanStatus(planForEvidence.id, TaskStatus.Done, evidenceText, attachments);
+                        setPlanForEvidence(null);
+                    }}
                 />
             )}
         </div>

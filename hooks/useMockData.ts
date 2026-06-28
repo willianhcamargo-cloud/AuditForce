@@ -152,9 +152,14 @@ export const useMockData = () => {
         }
     }, []);
 
-    const updateActionPlanStatus = useCallback((planId: string, newStatus: TaskStatus) => {
+    const updateActionPlanStatus = useCallback((planId: string, newStatus: TaskStatus, evidence?: string, evidenceAttachments?: Attachment[]) => {
         setActionPlans(currentPlans => 
-            currentPlans.map(p => (p.id === planId ? { ...p, status: newStatus } : p))
+            currentPlans.map(p => (p.id === planId ? { 
+                ...p, 
+                status: newStatus,
+                ...(evidence ? { evidence } : {}),
+                ...(evidenceAttachments ? { evidenceAttachments } : {})
+            } : p))
         );
     }, []);
     
@@ -281,11 +286,22 @@ export const useMockData = () => {
         setNotifications(current => current.map(n => (n.userId === userId ? { ...n, read: true } : n)));
     }, []);
 
+    const addNotification = useCallback((userId: string, message: string) => {
+        const newNotification: Notification = {
+            id: generateId(),
+            userId,
+            message,
+            timestamp: new Date().toISOString(),
+            read: false,
+        };
+        setNotifications(current => [...current, newNotification]);
+    }, []);
+
     return {
         users, grids, audits, actionPlans, policies, policyHistory, meetings, notifications,
         addUser, updateUser, addAudit, saveGrid, deleteGrid, saveActionPlan, updateActionPlanStatus,
         addFollowUpToActionPlan, updateFindingStatus, updateFindingDescription, addAttachment,
         deleteAttachment, updateAuditStatus, savePolicy, deletePolicy, saveMeeting, deleteMeeting,
-        markNotificationRead, markAllNotificationsRead,
+        markNotificationRead, markAllNotificationsRead, addNotification,
     };
 };

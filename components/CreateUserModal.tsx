@@ -79,7 +79,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
         
         setEmailError('');
 
-        if (!name || !email || (!password && !isEditing)) return;
+        if (!name || !email) return;
         
         if (isEditing) {
             const updatedData: UserSubmitData = { 
@@ -94,7 +94,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
             }
             onSubmit(updatedData);
         } else {
-            onSubmit({ name, email, role, password, avatarFile });
+            onSubmit({ name, email, role, avatarFile });
         }
         
         onClose();
@@ -141,10 +141,22 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
                             <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white" required />
                             {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Senha</label>
-                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={isEditing ? 'Deixe em branco para não alterar' : ''} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white" required={!isEditing} />
-                        </div>
+                        {isEditing ? (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Senha</label>
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Deixe em branco para não alterar" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white" />
+                            </div>
+                        ) : (
+                            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 rounded-md text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                                <div className="flex items-center font-semibold">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                    Convite de Cadastro por E-mail
+                                </div>
+                                <p>Por questões de segurança, este usuário definirá sua própria senha após aceitar o convite que será gerado e enviado para seu e-mail.</p>
+                            </div>
+                        )}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Função</label>
                             <select value={role} onChange={e => setRole(e.target.value as User['role'])} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>

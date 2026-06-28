@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import type { ActionPlan, User, Finding, PerformanceIndicator } from '../types';
+import type { ActionPlan, User, Finding, PerformanceIndicator, Attachment } from '../types';
 import { TaskStatus } from '../types';
 import { UserAvatar } from './UserAvatar';
+import { ActionPlanEvidenceModal } from './ActionPlanEvidenceModal';
 
 interface ActionPlanDetailsModalProps {
     plan: ActionPlan;
@@ -12,10 +13,19 @@ interface ActionPlanDetailsModalProps {
     onClose: () => void;
     onEdit: (plan: ActionPlan) => void;
     onAddFollowUp: (planId: string, content: string) => void;
-    onUpdateStatus: (planId: string, newStatus: TaskStatus) => void;
+    onUpdateStatus: (planId: string, newStatus: TaskStatus, evidence?: string, evidenceAttachments?: Attachment[]) => void;
     isReadOnly: boolean;
     currentUser: User;
 }
+
+const formatBytes = (bytes: number, decimals = 2) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
 
 const DetailItem: React.FC<{ label: string; value?: string | number | React.ReactNode; isBlock?: boolean }> = ({ label, value, isBlock = false }) => (
     <div className={isBlock ? "sm:col-span-2" : ""}>
@@ -52,6 +62,7 @@ const TASK_STATUS_CLASSES: Record<TaskStatus, string> = {
 
 export const ActionPlanDetailsModal: React.FC<ActionPlanDetailsModalProps> = ({ plan, user, finding, performanceIndicator, users, onClose, onEdit, onAddFollowUp, onUpdateStatus, isReadOnly, currentUser }) => {
     const [followUpContent, setFollowUpContent] = useState('');
+    const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
 
     const handleAddFollowUp = () => {
         if (followUpContent.trim()) {
@@ -92,12 +103,23 @@ export const ActionPlanDetailsModal: React.FC<ActionPlanDetailsModalProps> = ({ 
                         <DetailItem label="Quem? (Who)" value={user?.name} />
                         <DetailItem label="Quanto Custa? (How Much)" value={plan.howMuch ? `R$ ${plan.howMuch.toFixed(2)}` : 'Custo não definido'} />
                         <div className="sm:col-span-2">
-                           <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
+                            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
                            <dd className="mt-1">
                                 {!isReadOnly ? (
                                     <select
                                         value={plan.status}
-                                        onChange={(e) => onUpdateStatus(plan.id, e.target.value as TaskStatus)}
+                                        onChange={(e) => {
+                                            const nextStatus = e.target.value as TaskStatus;
+                                            if (nextStatus === TaskStatus.Done) {
+                                                if (plan.evidence && plan.evidenceAttachments && plan.evidenceAttachments.length > 0) {
+                                                    onUpdateStatus(plan.id, nextStatus);
+                                                } else {
+                                                    setIsEvidenceModalOpen(true);
+                                                }
+                                            } else {
+                                                onUpdateStatus(plan.id, nextStatus);
+                                            }
+                                        }}
                                         className={`w-full md:w-auto px-3 py-1.5 text-sm leading-5 font-semibold rounded-md transition-colors appearance-none border-2 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:ring-offset-gray-800 ${TASK_STATUS_CLASSES[plan.status]}`}
                                     >
                                         <option value={TaskStatus.Pending}>Pendente</option>
@@ -116,6 +138,40 @@ export const ActionPlanDetailsModal: React.FC<ActionPlanDetailsModalProps> = ({ 
 
                      {/* Follow-up Section */}
                     <div className="border-t dark:border-gray-700 pt-4">
+                      {/* Evidence Section */}
+                      {(plan.evidence || (plan.evidenceAttachments && plan.evidenceAttachments.length > 0)) && (
+                         <div className="border-t dark:border-gray-700 pt-4 mb-4">
+                             <h3 className="text-lg font-semibold text-on-surface dark:text-dark-on-surface mb-3 flex items-center text-green-600 dark:text-green-400">
+                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                 </svg>
+                                 Evidência de Conclusão
+                             </h3>
+                             <div className="bg-green-50 dark:bg-green-950/10 p-4 rounded-lg border border-green-200 dark:border-green-900/50">
+                                 {plan.evidence && (
+                                     <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap mb-3">{plan.evidence}</p>
+                                 )}
+                                 {plan.evidenceAttachments && plan.evidenceAttachments.length > 0 && (
+                                     <div>
+                                         <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Anexos de Evidência</h4>
+                                         <div className="flex flex-wrap">
+                                             {plan.evidenceAttachments.map(att => (
+                                                 <div key={att.id} className="bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-medium mr-2 mb-2 px-2.5 py-1.5 rounded-full flex items-center border border-gray-200 dark:border-gray-700 shadow-sm">
+                                                     <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center hover:underline">
+                                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                                                             <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a3 3 0 006 0V7a1 1 0 112 0v4a5 5 0 01-10 0V7a5 5 0 0110 0v4a1 1 0 11-2 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                                                         </svg>
+                                                         {att.name} ({formatBytes(att.size)})
+                                                     </a>
+                                                 </div>
+                                             ))}
+                                         </div>
+                                     </div>
+                                 )}
+                             </div>
+                         </div>
+                      )}
+
                         <h3 className="text-lg font-semibold text-on-surface dark:text-dark-on-surface mb-3">Follow-up</h3>
                         
                         {/* Add Follow-up Form */}
@@ -173,6 +229,18 @@ export const ActionPlanDetailsModal: React.FC<ActionPlanDetailsModalProps> = ({ 
                     )}
                 </div>
             </div>
+
+            {isEvidenceModalOpen && (
+                <ActionPlanEvidenceModal
+                    isOpen={isEvidenceModalOpen}
+                    onClose={() => setIsEvidenceModalOpen(false)}
+                    plan={plan}
+                    onConfirm={(evidenceText, attachments) => {
+                        onUpdateStatus(plan.id, TaskStatus.Done, evidenceText, attachments);
+                        setIsEvidenceModalOpen(false);
+                    }}
+                />
+            )}
         </div>
     );
 };
